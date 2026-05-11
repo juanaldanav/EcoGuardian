@@ -142,7 +142,7 @@ export default function ScreenMapa() {
       {/* ── INFO ESTACIÓN ───────────────────────────── */}
       <Card style={ss.card}>
         <View style={ss.cardHeader}>
-          <Text style={ss.cardTitle}>📍 Ubicación de la estación</Text>
+          <Text style={ss.cardTitle}>Ubicación de la estación</Text>
           <LiveDot />
         </View>
 
@@ -158,27 +158,6 @@ export default function ScreenMapa() {
           </View>
         )}
 
-        <SensorRow
-          icon="crosshairs-gps"
-          label="Latitud"
-          value={coords.lat.toFixed(6)}
-          unit="°N"
-          color={data?.gps_valido ? C.green : C.text3}
-        />
-        <SensorRow
-          icon="crosshairs-gps"
-          label="Longitud"
-          value={Math.abs(coords.lng).toFixed(6)}
-          unit="°O"
-          color={data?.gps_valido ? C.green : C.text3}
-        />
-        <SensorRow
-          icon="satellite-variant"
-          label="Satélites"
-          value={data?.satelites || 0}
-          unit="conectados"
-          color={data?.gps_valido ? C.green : C.text3}
-        />
         <SensorRow
           icon="map-marker"
           label="Estación"

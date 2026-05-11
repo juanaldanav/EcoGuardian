@@ -21,6 +21,9 @@ import ScreenAlertas    from "./screens/ScreenAlertas";
 import ScreenHistorial  from "./screens/ScreenHistorial";
 import ScreenAjustes    from "./screens/ScreenAjustes";
 import ScreenComunidad  from "./screens/ScreenComunidad";
+import ScreenLogin      from "./screens/ScreenLogin";
+import ScreenOnboarding from "./screens/ScreenOnboarding";
+import { useAuth }      from "./hooks/useAuth";
 import { C } from "./constants/colors";
 import { F } from "./constants/fonts";
 
@@ -134,6 +137,8 @@ export default function App() {
     JetBrainsMono_400Regular,
   });
 
+  const { user, perfil, loading: authLoading } = useAuth();
+
   // Si los TTF tardan más de 2.5 s o fallan, renderizamos igual (fallback a sistema)
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
@@ -141,8 +146,25 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
-  if (!fontsLoaded && !fontError && !timedOut) {
+  // Espera fuentes y auth antes de decidir qué mostrar
+  if ((!fontsLoaded && !fontError && !timedOut) || authLoading) {
     return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaProvider>
+        <ScreenLogin />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (!perfil?.onboardingCompleto) {
+    return (
+      <SafeAreaProvider>
+        <ScreenOnboarding uid={user.uid} nombre={perfil?.nombre || ""} />
+      </SafeAreaProvider>
+    );
   }
 
   return (

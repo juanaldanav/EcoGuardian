@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import { ref, onValue, set } from "firebase/database";
@@ -36,10 +37,11 @@ export function useAuth() {
           setPerfil(snapshot.val());
         } else {
           const nuevoPerfil = {
-            nombre:   firebaseUser.displayName ?? firebaseUser.email,
-            email:    firebaseUser.email,
-            rol:      "usuario",
-            creadoEn: Math.floor(Date.now() / 1000),
+            nombre:               firebaseUser.displayName ?? firebaseUser.email,
+            email:                firebaseUser.email,
+            rol:                  "usuario",
+            creadoEn:             Math.floor(Date.now() / 1000),
+            onboardingCompleto:   false,
           };
           set(perfilRef, nuevoPerfil);
           setPerfil(nuevoPerfil);
@@ -59,7 +61,19 @@ export function useAuth() {
 
   const logout = () => signOut(auth);
 
+  const register = async (email, password, nombre) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await set(ref(db, `usuarios/${cred.user.uid}`), {
+      nombre:             nombre.trim() || email,
+      email,
+      rol:                "usuario",
+      creadoEn:           Math.floor(Date.now() / 1000),
+      onboardingCompleto: false,
+    });
+    return cred;
+  };
+
   const isAdmin = perfil?.rol === "admin";
 
-  return { user, perfil, isAdmin, loading, login, logout };
+  return { user, perfil, isAdmin, loading, login, logout, register };
 }
