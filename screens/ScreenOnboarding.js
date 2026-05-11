@@ -80,6 +80,7 @@ function QRScanner({ onScanned }) {
 // ── Pantalla principal ────────────────────────────────────────
 export default function ScreenOnboarding({ uid, nombre }) {
   const [paso,          setPaso]          = useState(0);
+  const [sinDispositivo, setSinDispositivo] = useState(false);
   const [stationId,     setStationId]     = useState("");
   const [codigoManual,  setCodigoManual]  = useState(false);
   const [codigoInput,   setCodigoInput]   = useState("");
@@ -168,18 +169,15 @@ export default function ScreenOnboarding({ uid, nombre }) {
 
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.border, marginTop: 12 }]}
-            onPress={() => finalizar(false)}
+            onPress={() => { setSinDispositivo(true); setPaso(5); }}
             activeOpacity={0.8}
-            disabled={saving}
           >
-            {saving
-              ? <ActivityIndicator size="small" color={C.text3} />
-              : <MaterialCommunityIcons name="clock-outline" size={24} color={C.text3} />
-            }
+            <MaterialCommunityIcons name="clock-outline" size={24} color={C.text3} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={ss.opcionTitulo}>Aún no tengo uno</Text>
-              <Text style={ss.opcionSub}>Entraré a la app y lo configuro después</Text>
+              <Text style={ss.opcionSub}>Exploraré la red y lo configuro después</Text>
             </View>
+            <Ionicons name="arrow-forward" size={18} color={C.text3} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -358,6 +356,40 @@ export default function ScreenOnboarding({ uid, nombre }) {
             <Text style={ss.linkBtnTxt}>Omitir por ahora</Text>
           </TouchableOpacity>
         </ScrollView>
+      </View>
+    );
+  }
+
+  // ── PASO 5: Confirmación sin dispositivo ───────────────────
+  if (paso === 5 && sinDispositivo) {
+    return (
+      <View style={ss.root}>
+        <View style={ss.centrado}>
+          <View style={[ss.logoBox, { backgroundColor: C.bg2 }]}>
+            <MaterialCommunityIcons name="earth" size={44} color={C.green} />
+          </View>
+          <Text style={ss.bienvenidaTitulo}>Todo listo</Text>
+          <Text style={[ss.bienvenidaSub, { marginBottom: 12 }]}>
+            Puedes explorar datos de calidad del aire de la red pública y reportar incidentes en tu comunidad.
+          </Text>
+          <Text style={[ss.bienvenidaSub, { fontSize: 12, marginBottom: 40 }]}>
+            Cuando tengas tu dispositivo, vincúlalo desde la sección Ajustes.
+          </Text>
+          <TouchableOpacity
+            style={[ss.btnPrim, { opacity: saving ? 0.6 : 1 }]}
+            onPress={() => finalizar(false)}
+            disabled={saving}
+            activeOpacity={0.8}
+          >
+            {saving
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <>
+                  <Text style={ss.btnPrimTxt}>Entrar a EcoGuardian</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
+                </>
+            }
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
