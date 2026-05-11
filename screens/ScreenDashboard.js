@@ -68,8 +68,10 @@ function ResumenModal({ visible, onClose, data, hist }) {
               {/* Lectura actual */}
               <View style={ss.modalSection}>
                 <Text style={ss.modalSub}>LECTURA ACTUAL</Text>
-                <View style={[ss.nivelBox, { backgroundColor:info.color+"15", borderColor:info.color+"44" }]}>
-                  <Text style={{ fontSize:32 }}>{info.emoji}</Text>
+                <View style={[ss.nivelBox, { backgroundColor:info.color+"15" }]}>
+                  <View style={{ width:48, height:48, borderRadius:14, backgroundColor:info.color, alignItems:"center", justifyContent:"center" }}>
+                    <MaterialCommunityIcons name="air-purifier" size={26} color="#fff" />
+                  </View>
                   <View style={{ flex:1, marginLeft:12 }}>
                     <Text style={[ss.nivelLabel, { color:info.color }]}>{info.label}</Text>
                     <Text style={{ color:C.text2, fontSize:12, marginTop:3 }}>
@@ -88,7 +90,7 @@ function ResumenModal({ visible, onClose, data, hist }) {
                     { label:"PM10",   val:avgPM10, unit:"µg/m³", color:C.yellow,      icon:"blur" },
                     { label:"CO₂",   val:avgCO2,  unit:"ppm",   color:C.text2,       icon:"molecule-co2" },
                   ].map((item, i) => (
-                    <View key={i} style={[ss.promedioCard, { borderColor:item.color+"44" }]}>
+                    <View key={i} style={ss.promedioCard}>
                       <MaterialCommunityIcons name={item.icon} size={18} color={item.color} />
                       <Text style={[ss.promedioVal, { color:item.color }]}>{item.val}</Text>
                       <Text style={ss.promedioUnit}>{item.unit}</Text>
@@ -102,10 +104,10 @@ function ResumenModal({ visible, onClose, data, hist }) {
               <View style={ss.modalSection}>
                 <Text style={ss.modalSub}>ÚLTIMA ACTUALIZACIÓN</Text>
                 <Text style={{ color:C.text, fontSize:14, fontWeight:"600" }}>
-                  {timeSince(data?.timestamp)
-                    ? `Hace ${timeSince(data?.timestamp)}`
+                  {timeSince(data?.receivedAt)
+                    ? `Hace ${timeSince(data?.receivedAt)}`
                     : "Sin datos recientes"
-                  } — {data?.nombre || "Estación Centro"}
+                  } — {data?.nombre || "estacion_01"}
                 </Text>
               </View>
 
@@ -128,8 +130,8 @@ export default function ScreenDashboard() {
   const { hist }          = useHistory();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const online   = isDeviceOnline(data?.timestamp);
-  const lastSync = timeSince(data?.timestamp);
+  const online   = isDeviceOnline(data?.receivedAt);
+  const lastSync = timeSince(data?.receivedAt);
 
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const fadeAnim   = useRef(new Animated.Value(0)).current;
@@ -245,15 +247,24 @@ export default function ScreenDashboard() {
           </Card>
 
           <Card style={ss.sensorCard}>
-            <View style={ss.cardHeader}>
-              <Text style={ss.cardTitle}>GPS</Text>
-              <Text style={{ fontSize:11, color:data.gps_valido?C.green:C.text3, fontWeight:"600" }}>
-                {data.gps_valido ? "✓ Señal" : "Sin señal"}
-              </Text>
-            </View>
-            <SensorRow icon="crosshairs-gps"    label="Latitud"   value={(data.lat||0).toFixed(5)} unit="°N"  color={C.green} />
-            <SensorRow icon="crosshairs-gps"    label="Longitud"  value={(data.lng||0).toFixed(5)} unit="°O"  color={C.green} />
-            <SensorRow icon="satellite-variant" label="Satélites" value={data.satelites||0}         unit="sat" color={C.text2} />
+            {(() => {
+              const hasCoords = data.lat && data.lng && data.lat !== 0 && data.lng !== 0;
+              const gpsFix    = data.gps_valido;
+              const gpsLabel  = gpsFix ? "✓ Fix GPS" : hasCoords ? "Adquiriendo..." : "Sin señal";
+              const gpsColor  = gpsFix ? C.green    : hasCoords ? C.yellow         : C.text3;
+              const sats      = data.satelites || 0;
+              return (
+                <>
+                  <View style={ss.cardHeader}>
+                    <Text style={ss.cardTitle}>GPS</Text>
+                    <Text style={{ fontSize:11, color:gpsColor, fontWeight:"600" }}>{gpsLabel}</Text>
+                  </View>
+                  <SensorRow icon="crosshairs-gps"    label="Latitud"   value={hasCoords ? data.lat.toFixed(5) : "---"} unit="°N"  color={hasCoords ? gpsColor : C.text3} />
+                  <SensorRow icon="crosshairs-gps"    label="Longitud"  value={hasCoords ? data.lng.toFixed(5) : "---"} unit="°O"  color={hasCoords ? gpsColor : C.text3} />
+                  <SensorRow icon="satellite-variant" label="Satélites" value={sats > 0 ? sats : hasCoords ? "..." : "0"} unit={sats > 0 ? "sat" : ""} color={sats > 0 ? C.green : C.text3} />
+                </>
+              );
+            })()}
           </Card>
         </Animated.View>
       )}
@@ -263,7 +274,7 @@ export default function ScreenDashboard() {
         <View style={ss.alertBanner}>
           <Text style={ss.alertTitle}>Alerta de Calidad del Aire</Text>
           <Text style={ss.alertDesc}>
-            {info.emoji} {info.label} — PM2.5: {pm25.toFixed(1)} µg/m³. Evita actividad al aire libre.
+            {info.label} — PM2.5: {pm25.toFixed(1)} µg/m³. Evita actividad al aire libre.
           </Text>
         </View>
       )}
@@ -341,11 +352,11 @@ const ss = StyleSheet.create({
   modalSub:     { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3,
                   letterSpacing:2, marginBottom:8, textTransform:"uppercase" },
   nivelBox:     { flexDirection:"row", alignItems:"center", padding:14,
-                  borderRadius:12, borderWidth:1 },
+                  borderRadius:12 },
   nivelLabel:   { fontFamily:"Outfit_700Bold", fontSize:20 },
   promediosGrid:{ flexDirection:"row", gap:8 },
   promedioCard: { flex:1, backgroundColor:C.bg2, borderRadius:12, padding:10,
-                  alignItems:"center", gap:4, borderWidth:1 },
+                  alignItems:"center", gap:4 },
   promedioVal:  { fontFamily:"JetBrainsMono_400Regular", fontSize:18, fontWeight:"800" },
   promedioUnit: { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
   promedioLabel:{ fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2 },

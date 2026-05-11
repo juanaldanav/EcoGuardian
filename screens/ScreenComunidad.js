@@ -9,13 +9,20 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  ImageBackground,
+  Image,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import Card from "../components/Card";
 import { useAuth } from "../hooks/useAuth";
 import { useComunidad, TIPOS_REPORTE } from "../hooks/useComunidad";
 import { C } from "../constants/colors";
+
+const { height: SCREEN_H } = Dimensions.get("window");
+const HERO_H = SCREEN_H - 120;
 
 function tiempoRelativo(ts) {
   const s = Math.floor(Date.now() / 1000 - ts);
@@ -28,61 +35,105 @@ function tiempoRelativo(ts) {
 }
 
 const ESTADO_COLORES = {
-  activo: C.green,
+  pendiente:  C.text3,
+  activo:     C.red,
   verificado: C.yellow,
-  resuelto: C.text3,
+  resuelto:   C.green,
 };
 
 const ESTADO_LABELS = {
-  activo: "Activo",
+  pendiente:  "Pendiente",
+  activo:     "Activo",
   verificado: "Verificado",
-  resuelto: "Resuelto",
+  resuelto:   "Resuelto",
 };
 
 export default function ScreenComunidad() {
-  const { user, perfil, isAdmin } = useAuth();
+  const { user, perfil, isAdmin, login } = useAuth();
   const { reportes, loading, publicar, actualizarEstado } = useComunidad();
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [tipoSeleccionado, setTipoSeleccionado] = useState(null);
-  const [descripcion, setDescripcion] = useState("");
-  const [publicando, setPublicando] = useState(false);
+  const [modalLogin, setModalLogin]         = useState(false);
+  const [modalReporte, setModalReporte]     = useState(false);
+  const [loginEmail, setLoginEmail]         = useState("");
+  const [loginPass, setLoginPass]           = useState("");
+  const [loginVerPass, setLoginVerPass]     = useState(false);
+  const [loginLoading, setLoginLoading]     = useState(false);
+  const [loginError, setLoginError]         = useState("");
+  const [tipoSeleccionado, setTipoSel]      = useState(null);
+  const [descripcion, setDescripcion]       = useState("");
+  const [imagenUri, setImagenUri]           = useState(null);
+  const [publicando, setPublicando]         = useState(false);
+
+  function handleReportar() {
+    if (user) setModalReporte(true);
+    else      setModalLogin(true);
+  }
 
   function handlePresionarCard(reporte) {
     if (!isAdmin) return;
     Alert.alert("Actualizar estado", `Reporte: ${reporte.descripcion}`, [
-      {
-        text: "Marcar verificado",
-        onPress: () => actualizarEstado(reporte.id, "verificado"),
-      },
-      {
-        text: "Marcar resuelto",
-        onPress: () => actualizarEstado(reporte.id, "resuelto"),
-      },
+      { text: "Marcar verificado", onPress: () => actualizarEstado(reporte.id, "verificado") },
+      { text: "Marcar resuelto",   onPress: () => actualizarEstado(reporte.id, "resuelto")   },
       { text: "Cancelar", style: "cancel" },
     ]);
   }
 
+  async function handleLogin() {
+    if (!loginEmail.trim() || !loginPass) return;
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      await login(loginEmail.trim(), loginPass);
+      setModalLogin(false);
+      setLoginEmail(""); setLoginPass("");
+    } catch (e) {
+      const map = {
+        "auth/invalid-credential": "Correo o contraseña incorrectos",
+        "auth/wrong-password":     "Correo o contraseña incorrectos",
+        "auth/user-not-found":     "Usuario no encontrado",
+        "auth/invalid-email":      "Correo inválido",
+      };
+      setLoginError(map[e.code] || "Error al iniciar sesión");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso requerido", "Necesitamos acceso a tu galería.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        Alert.alert("Imagen muy grande", "El máximo permitido es 5 MB.");
+        return;
+      }
+      setImagenUri(asset.uri);
+    }
+  }
+
   async function handlePublicar() {
-    if (!tipoSeleccionado) {
-      Alert.alert("Selecciona un tipo de reporte");
-      return;
-    }
-    if (!descripcion.trim()) {
-      Alert.alert("Escribe una descripcion");
-      return;
-    }
+    if (!tipoSeleccionado) { Alert.alert("Selecciona un tipo de reporte"); return; }
+    if (!descripcion.trim()) { Alert.alert("Escribe una descripción"); return; }
     setPublicando(true);
     try {
       await publicar({
-        tipo: tipoSeleccionado,
+        tipo:        tipoSeleccionado,
         descripcion: descripcion.trim(),
-        autorId: user.uid,
-        autorNombre: perfil?.nombre || user.email || "Usuario",
+        autorId:     user.uid,
+        autorNombre: perfil?.nombre || user.email,
+        imagenUri:   imagenUri || null,
       });
-      setModalVisible(false);
-      setTipoSeleccionado(null);
-      setDescripcion("");
+      setModalReporte(false);
+      setTipoSel(null); setDescripcion(""); setImagenUri(null);
     } catch (e) {
       Alert.alert("Error al publicar", e.message || "Intenta de nuevo");
     } finally {
@@ -90,83 +141,49 @@ export default function ScreenComunidad() {
     }
   }
 
-  function handleCancelar() {
-    setModalVisible(false);
-    setTipoSeleccionado(null);
-    setDescripcion("");
-  }
-
-  if (!user) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.sinSesionWrap}>
-          <Card style={styles.sinSesionCard}>
-            <Ionicons name="people-outline" size={40} color={C.text3} />
-            <Text style={styles.sinSesionTexto}>
-              Inicia sesion para ver y publicar reportes de la comunidad
-            </Text>
-            <TouchableOpacity
-              style={styles.btnVerde}
-              onPress={() =>
-                Alert.alert(
-                  "Iniciar sesion",
-                  "Ve a Ajustes para iniciar sesion."
-                )
-              }
-            >
-              <Text style={styles.btnVerdeTexto}>Iniciar sesion</Text>
-            </TouchableOpacity>
-          </Card>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.titulo}>Comunidad</Text>
-            <Text style={styles.subtitulo}>Reportes de la zona</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.btnVerde}
-            onPress={() => setModalVisible(true)}
-          >
-            <Text style={styles.btnVerdeTexto}>+ Reportar</Text>
-          </TouchableOpacity>
-        </View>
+    <View style={ss.root}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
 
-        {/* Feed */}
+        {/* ── HERO — imagen completa ──────────────────── */}
+        <ImageBackground
+          source={require("../assets/comunidad-background.webp")}
+          style={ss.heroBg}
+          resizeMode="cover"
+        >
+          <View style={ss.greenFilter} />
+          <View style={ss.heroContent}>
+            <View style={ss.heroBadge}>
+              <View style={ss.heroBadgeDot} />
+              <Text style={ss.heroBadgeTxt}>RED CIUDADANA</Text>
+            </View>
+            <Text style={ss.heroTitle}>Comunidad</Text>
+            <Text style={ss.heroSub}>Reportes ambientales de la zona</Text>
+            <TouchableOpacity style={ss.btnReportar} onPress={handleReportar} activeOpacity={0.85}>
+              <Ionicons name="add-circle-outline" size={18} color={C.greenD} />
+              <Text style={ss.btnReportarTxt}>Reportar incidente</Text>
+            </TouchableOpacity>
+            {user && (
+              <Text style={ss.heroSesion}>Sesión: {perfil?.nombre || user.email}</Text>
+            )}
+          </View>
+        </ImageBackground>
+
+        {/* ── FEED ────────────────────────────────────── */}
         {loading ? (
-          <ActivityIndicator
-            color={C.green}
-            size="large"
-            style={styles.spinner}
-          />
+          <ActivityIndicator color={C.green} size="large" style={{ marginTop: 40 }} />
         ) : reportes.length === 0 ? (
-          <View style={styles.vacioCont}>
-            <MaterialCommunityIcons
-              name="clipboard-text-outline"
-              size={36}
-              color={C.text3}
-            />
-            <Text style={styles.vacioTexto}>Sin reportes aun</Text>
+          <View style={ss.vacioCont}>
+            <MaterialCommunityIcons name="clipboard-text-outline" size={36} color={C.text3} />
+            <Text style={ss.vacioTexto}>Sin reportes aún</Text>
+            <Text style={ss.vacioSub}>Sé el primero en reportar un incidente ambiental</Text>
           </View>
         ) : (
           reportes.map((reporte) => {
-            const tipo = TIPOS_REPORTE.find((t) => t.key === reporte.tipo);
-            const iconoNombre = tipo?.icon || "alert-circle-outline";
+            const tipo       = TIPOS_REPORTE.find((t) => t.key === reporte.tipo);
             const iconoColor = tipo?.color || C.text3;
-            const estadoColor =
-              ESTADO_COLORES[reporte.estado] || C.text3;
-            const estadoLabel =
-              ESTADO_LABELS[reporte.estado] || reporte.estado;
+            const estadoColor = ESTADO_COLORES[reporte.estado] || C.text3;
+            const estadoLabel = ESTADO_LABELS[reporte.estado]  || reporte.estado;
 
             return (
               <TouchableOpacity
@@ -174,46 +191,23 @@ export default function ScreenComunidad() {
                 activeOpacity={isAdmin ? 0.6 : 1}
                 onPress={() => handlePresionarCard(reporte)}
               >
-                <Card style={styles.reporteCard}>
-                  {/* Icono tipo */}
-                  <View
-                    style={[
-                      styles.iconoCirculo,
-                      { backgroundColor: iconoColor + "22" },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={iconoNombre}
-                      size={20}
-                      color={iconoColor}
-                    />
+                <Card style={ss.reporteCard}>
+                  <View style={ss.reporteRow}>
+                    <MaterialCommunityIcons name={tipo?.icon || "alert-circle-outline"} size={22} color={iconoColor} />
+                    <View style={{ flex: 1 }}>
+                      <View style={ss.reporteHeader}>
+                        <Text style={ss.reporteTipo}>{tipo?.label || reporte.tipo}</Text>
+                        <Text style={[ss.badgeTxt, { color: estadoColor }]}>{estadoLabel}</Text>
+                      </View>
+                      <Text style={ss.reporteDesc} numberOfLines={3}>{reporte.descripcion}</Text>
+                      <Text style={ss.reporteMeta}>
+                        {reporte.autorNombre} · {tiempoRelativo(reporte.creadoEn)}
+                      </Text>
+                    </View>
                   </View>
-
-                  {/* Contenido */}
-                  <View style={styles.reporteContenido}>
-                    <Text style={styles.reporteTipo}>
-                      {tipo?.label || reporte.tipo}
-                    </Text>
-                    <Text style={styles.reporteDesc} numberOfLines={2}>
-                      {reporte.descripcion}
-                    </Text>
-                    <Text style={styles.reporteMeta}>
-                      Por {reporte.autorNombre} · hace{" "}
-                      {tiempoRelativo(reporte.timestamp)}
-                    </Text>
-                  </View>
-
-                  {/* Badge estado */}
-                  <View
-                    style={[
-                      styles.badge,
-                      { backgroundColor: estadoColor + "22" },
-                    ]}
-                  >
-                    <Text style={[styles.badgeTexto, { color: estadoColor }]}>
-                      {estadoLabel}
-                    </Text>
-                  </View>
+                  {reporte.imageUrl ? (
+                    <Image source={{ uri: reporte.imageUrl }} style={ss.reporteImg} />
+                  ) : null}
                 </Card>
               </TouchableOpacity>
             );
@@ -221,84 +215,108 @@ export default function ScreenComunidad() {
         )}
       </ScrollView>
 
-      {/* Modal nuevo reporte */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={handleCancelar}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCont}>
-            <Text style={styles.modalTitulo}>Nuevo reporte</Text>
+      {/* ── MODAL LOGIN ─────────────────────────────── */}
+      <Modal visible={modalLogin} animationType="fade" transparent onRequestClose={() => setModalLogin(false)}>
+        <View style={ss.modalOverlay}>
+          <View style={ss.modalBox}>
+            <Text style={ss.modalTitulo}>Continuar con tu cuenta</Text>
+            <Text style={ss.modalSub}>Inicia sesión para publicar y participar</Text>
+            <View style={{ height: 1, backgroundColor: C.border }} />
 
-            {/* Selector de tipo */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipsScroll}
-            >
+            <Text style={ss.inputLabel}>Correo</Text>
+            <TextInput
+              style={ss.input}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              placeholder="correo@ejemplo.com"
+              placeholderTextColor={C.text3}
+              value={loginEmail}
+              onChangeText={setLoginEmail}
+            />
+
+            <Text style={ss.inputLabel}>Contraseña</Text>
+            <View style={ss.inputRow}>
+              <TextInput
+                style={[ss.input, { flex: 1 }]}
+                secureTextEntry={!loginVerPass}
+                placeholder="Contraseña"
+                placeholderTextColor={C.text3}
+                value={loginPass}
+                onChangeText={setLoginPass}
+              />
+              <TouchableOpacity style={ss.eyeBtn} onPress={() => setLoginVerPass(v => !v)}>
+                <Ionicons name={loginVerPass ? "eye-off-outline" : "eye-outline"} size={18} color={C.text3} />
+              </TouchableOpacity>
+            </View>
+
+            {loginError ? <Text style={ss.errorTxt}>{loginError}</Text> : null}
+
+            <TouchableOpacity style={ss.btnPrimario} onPress={handleLogin} disabled={loginLoading}>
+              {loginLoading
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={ss.btnPrimarioTxt}>Iniciar sesión</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={ss.btnSecundario} onPress={() => { setModalLogin(false); setLoginEmail(""); setLoginPass(""); setLoginError(""); }} disabled={loginLoading}>
+              <Text style={ss.btnSecundarioTxt}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── MODAL CREAR REPORTE ─────────────────────── */}
+      <Modal
+        visible={modalReporte}
+        animationType="fade"
+        transparent
+        onRequestClose={() => { setModalReporte(false); setTipoSel(null); setDescripcion(""); setImagenUri(null); }}
+      >
+        <View style={ss.modalOverlay}>
+          <View style={ss.modalBox}>
+            <Text style={ss.modalTitulo}>Nuevo reporte</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
               {TIPOS_REPORTE.map((tipo) => {
-                const seleccionado = tipoSeleccionado === tipo.key;
+                const sel = tipoSeleccionado === tipo.key;
                 return (
                   <TouchableOpacity
                     key={tipo.key}
-                    style={[
-                      styles.chip,
-                      seleccionado && {
-                        backgroundColor: tipo.color + "22",
-                        borderColor: tipo.color + "66",
-                        borderWidth: 1,
-                      },
-                    ]}
-                    onPress={() => setTipoSeleccionado(tipo.key)}
+                    style={[ss.chip, sel && { backgroundColor: tipo.color + "22", borderColor: tipo.color + "66", borderWidth: 1 }]}
+                    onPress={() => setTipoSel(tipo.key)}
                   >
-                    <MaterialCommunityIcons
-                      name={tipo.icon}
-                      size={16}
-                      color={tipo.color}
-                    />
-                    <Text
-                      style={[styles.chipTexto, { color: tipo.color }]}
-                    >
-                      {tipo.label}
-                    </Text>
+                    <MaterialCommunityIcons name={tipo.icon} size={15} color={tipo.color} />
+                    <Text style={[ss.chipTexto, { color: tipo.color }]}>{tipo.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
 
-            {/* Descripcion */}
             <TextInput
-              style={styles.input}
-              placeholder="Describe que esta pasando..."
+              style={[ss.input, { minHeight: 72, textAlignVertical: "top" }]}
+              placeholder="Describe qué está pasando..."
               placeholderTextColor={C.text3}
               multiline
-              numberOfLines={3}
-              textAlignVertical="top"
               value={descripcion}
               onChangeText={setDescripcion}
             />
 
-            {/* Acciones */}
-            <TouchableOpacity
-              style={[styles.btnVerde, styles.btnPublicar]}
-              onPress={handlePublicar}
-              disabled={publicando}
-            >
-              {publicando ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.btnVerdeTexto}>Publicar</Text>
-              )}
+            <TouchableOpacity style={ss.btnFoto} onPress={pickImage}>
+              <Ionicons name="camera-outline" size={18} color={C.green} />
+              <Text style={ss.btnFotoTxt}>{imagenUri ? "Cambiar foto" : "Adjuntar foto"}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.btnCancelar}
-              onPress={handleCancelar}
-              disabled={publicando}
-            >
-              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
+            {imagenUri ? (
+              <Image source={{ uri: imagenUri }} style={{ height: 120, borderRadius: 10 }} />
+            ) : null}
+
+            <TouchableOpacity style={ss.btnPrimario} onPress={handlePublicar} disabled={publicando}>
+              {publicando
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={ss.btnPrimarioTxt}>Publicar</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={ss.btnSecundario} onPress={() => { setModalReporte(false); setTipoSel(null); setDescripcion(""); setImagenUri(null); }} disabled={publicando}>
+              <Text style={ss.btnSecundarioTxt}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -307,164 +325,124 @@ export default function ScreenComunidad() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 32,
-  },
+const ss = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
 
-  /* Sin sesion */
-  sinSesionWrap: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
+  /* Hero */
+  heroBg: {
+    height: HERO_H,
+    justifyContent: "flex-end",
   },
-  sinSesionCard: {
-    alignItems: "center",
-    padding: 32,
-    gap: 16,
+  greenFilter: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 60, 25, 0.62)",
   },
-  sinSesionTexto: {
+  heroContent: {
+    padding: 28,
+    paddingBottom: 36,
+  },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 14,
+  },
+  heroBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#6fcf97",
+  },
+  heroBadgeTxt: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 2,
+  },
+  heroTitle: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 42,
+    color: "#fff",
+    lineHeight: 48,
+  },
+  heroSub: {
     fontFamily: "Outfit_400Regular",
     fontSize: 15,
-    color: C.text2,
-    textAlign: "center",
-    lineHeight: 22,
+    color: "rgba(255,255,255,0.80)",
+    marginTop: 6,
+    marginBottom: 24,
   },
-
-  /* Header */
-  header: {
+  btnReportar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    gap: 8,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    alignSelf: "flex-start",
   },
-  titulo: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 22,
-    color: C.text,
-  },
-  subtitulo: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 13,
-    color: C.text3,
-    marginTop: 2,
-  },
-
-  /* Botones */
-  btnVerde: {
-    backgroundColor: C.green,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    alignItems: "center",
-  },
-  btnVerdeTexto: {
+  btnReportarTxt: {
     fontFamily: "Outfit_600SemiBold",
     fontSize: 14,
-    color: "#fff",
+    color: C.greenD,
+  },
+  heroSesion: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    marginTop: 12,
   },
 
   /* Feed */
-  spinner: {
-    marginTop: 40,
-  },
-  vacioCont: {
-    alignItems: "center",
-    marginTop: 48,
-    gap: 10,
-  },
-  vacioTexto: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 14,
-    color: C.text3,
-  },
+  vacioCont: { alignItems: "center", marginTop: 48, gap: 8 },
+  vacioTexto: { fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.text2 },
+  vacioSub:   { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.text3, textAlign: "center", paddingHorizontal: 32 },
 
   /* Reporte card */
-  reporteCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    marginBottom: 12,
-    gap: 12,
+  reporteCard:   { marginHorizontal: 16, marginTop: 12, marginBottom: 2, padding: 14 },
+  reporteRow:    { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  reporteHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  reporteTipo:   { fontFamily: "Outfit_700Bold", fontSize: 14, color: C.text },
+  reporteDesc:   { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text2, lineHeight: 18, marginTop: 2 },
+  reporteMeta:   { fontFamily: "Outfit_400Regular", fontSize: 11, color: C.text3, marginTop: 4 },
+  badgeTxt:      { fontFamily: "Outfit_600SemiBold", fontSize: 11 },
+  reporteImg:    { width: "100%", height: 160, borderRadius: 8, marginTop: 8 },
+
+  /* Modal */
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.50)", justifyContent: "center", padding: 20 },
+  modalBox: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 24,
+    padding: 24,
+    gap: 14,
   },
-  iconoCirculo: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  reporteContenido: {
-    flex: 1,
-    gap: 2,
-  },
-  reporteTipo: {
-    fontFamily: "Outfit_700Bold",
+  modalTitulo:  { fontFamily: "Outfit_700Bold", fontSize: 18, color: C.text },
+  modalSub:     { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text3, marginTop: -8 },
+  inputLabel:   { fontFamily: "Outfit_600SemiBold", fontSize: 12, color: C.text2 },
+  input: {
+    backgroundColor: C.bg2,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontFamily: "Outfit_400Regular",
     fontSize: 14,
     color: C.text,
   },
-  reporteDesc: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 13,
-    color: C.text2,
-    lineHeight: 18,
+  inputRow:  { flexDirection: "row", alignItems: "center", gap: 8 },
+  eyeBtn:    { padding: 8, backgroundColor: C.bg2, borderRadius: 10 },
+  errorTxt:  { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.red },
+  btnPrimario: {
+    backgroundColor: C.green,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
   },
-  reporteMeta: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 11,
-    color: C.text3,
-    marginTop: 2,
-  },
-  badge: {
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignSelf: "flex-start",
-    flexShrink: 0,
-  },
-  badgeTexto: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 11,
-  },
-
-  /* Modal */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "flex-end",
-  },
-  modalCont: {
-    backgroundColor: C.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 36,
-    gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  modalTitulo: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 18,
-    color: C.text,
-  },
+  btnPrimarioTxt:  { fontFamily: "Outfit_700Bold", fontSize: 14, color: "#fff" },
+  btnSecundario:   { alignItems: "center", paddingVertical: 10 },
+  btnSecundarioTxt:{ fontFamily: "Outfit_600SemiBold", fontSize: 14, color: C.text3 },
 
   /* Chips */
-  chipsScroll: {
-    gap: 8,
-    paddingVertical: 2,
-  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -473,38 +451,18 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
     backgroundColor: C.bg2,
-    borderWidth: 1,
-    borderColor: "transparent",
   },
-  chipTexto: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 13,
-  },
+  chipTexto: { fontFamily: "Outfit_600SemiBold", fontSize: 13 },
 
-  /* Input */
-  input: {
-    backgroundColor: C.bg,
-    borderRadius: 10,
-    padding: 12,
-    fontFamily: "Outfit_400Regular",
-    fontSize: 14,
-    color: C.text,
-    minHeight: 80,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-
-  /* Botones modal */
-  btnPublicar: {
-    paddingVertical: 14,
-  },
-  btnCancelar: {
+  /* Foto */
+  btnFoto: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    borderRadius: 10,
     paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: C.green + "12",
   },
-  btnCancelarTexto: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 14,
-    color: C.text3,
-  },
+  btnFotoTxt: { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.green },
 });

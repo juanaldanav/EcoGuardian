@@ -27,14 +27,16 @@ export default function ScreenAlertas() {
           <LiveDot />
         </View>
         <View style={[ss.estadoBox, { backgroundColor:info.color+"10" }]}>
-          <Text style={{ fontSize:40 }}>{info.emoji}</Text>
+          <View style={{ width:40, height:40, borderRadius:12, backgroundColor:info.color, alignItems:"center", justifyContent:"center" }}>
+            <Ionicons name="leaf" size={22} color="#fff" />
+          </View>
           <View style={{ flex:1, marginLeft:16 }}>
             <Text style={[ss.estadoLabel, { color:info.color }]}>{info.label}</Text>
             <Text style={{ color:C.text2, fontSize:12, marginTop:4 }}>
               PM2.5: {(data?.pm25||0).toFixed(1)} µg/m³
             </Text>
             <Text style={{ color:C.text3, fontSize:11, marginTop:2 }}>
-              Actualizado hace {timeSince(data?.timestamp)}
+              Actualizado hace {timeSince(data?.receivedAt) ?? "---"}
             </Text>
           </View>
         </View>
@@ -76,7 +78,7 @@ export default function ScreenAlertas() {
               return (
                 <View key={i} style={[ss.alertaRow, i<alerts.length-1&&{ borderBottomWidth:1, borderBottomColor:C.border }]}>
                   <View style={[ss.alertaIcon, { backgroundColor:ni.color+"22" }]}>
-                    <Text style={{ fontSize:16 }}>{ni.emoji}</Text>
+                    <Ionicons name="warning" size={16} color={ni.color} />
                   </View>
                   <View style={{ flex:1 }}>
                     <Text style={{ color:C.text, fontSize:12, fontWeight:"700" }}>{a.estacion||"Estación"}</Text>

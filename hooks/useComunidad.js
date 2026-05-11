@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  ref,
+  ref as dbRef,
   onValue,
   query,
   orderByKey,
@@ -8,7 +8,12 @@ import {
   set,
   update,
 } from "firebase/database";
-import { db } from "../constants/firebase";
+import {
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+import { db, storage } from "../constants/firebase";
 
 export const TIPOS_REPORTE = [
   { key: "incendio",        label: "Incendio",              icon: "fire",                 color: "#C62828" },
@@ -18,13 +23,30 @@ export const TIPOS_REPORTE = [
   { key: "otro",            label: "Otro",                  icon: "alert-circle-outline", color: "#4A6B52" },
 ];
 
+const MIME_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+async function subirImagen(imagenUri, reporteId) {
+  const response = await fetch(imagenUri);
+  const blob     = await response.blob();
+
+  const mime = blob.type || "image/jpeg";
+  if (!MIME_PERMITIDOS.includes(mime)) {
+    throw new Error(`Tipo de archivo no permitido: ${mime}`);
+  }
+
+  const ext = mime.split("/")[1] ?? "jpg";
+  const sRef = storageRef(storage, `comunidad/reportes/${reporteId}.${ext}`);
+  await uploadBytes(sRef, blob, { contentType: mime });
+  return getDownloadURL(sRef);
+}
+
 export function useComunidad() {
   const [reportes, setReportes] = useState([]);
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     const reportesRef = query(
-      ref(db, "comunidad/reportes"),
+      dbRef(db, "comunidad/reportes"),
       orderByKey(),
       limitToLast(50)
     );
@@ -36,7 +58,7 @@ export function useComunidad() {
         return;
       }
 
-      const data = snapshot.val();
+      const data  = snapshot.val();
       const lista = Object.entries(data)
         .map(([id, val]) => ({ id, ...val }))
         .reverse();
@@ -48,9 +70,15 @@ export function useComunidad() {
     return () => unsub();
   }, []);
 
-  const publicar = ({ tipo, descripcion, lat, lng, autorId, autorNombre }) => {
-    const id        = `rep_${Date.now()}`;
-    const reporteRef = ref(db, `comunidad/reportes/${id}`);
+  const publicar = async ({ tipo, descripcion, lat, lng, autorId, autorNombre, imagenUri }) => {
+    const id         = `rep_${Date.now()}`;
+    const reporteRef = dbRef(db, `comunidad/reportes/${id}`);
+
+    let imageUrl = null;
+    if (imagenUri) {
+      imageUrl = await subirImagen(imagenUri, id);
+    }
+
     return set(reporteRef, {
       tipo,
       descripcion,
@@ -58,13 +86,14 @@ export function useComunidad() {
       lng,
       autorId,
       autorNombre,
-      estado:    "pendiente",
-      creadoEn:  Math.floor(Date.now() / 1000),
+      ...(imageUrl ? { imageUrl } : {}),
+      estado:   "pendiente",
+      creadoEn: Math.floor(Date.now() / 1000),
     });
   };
 
   const actualizarEstado = (id, estado) =>
-    update(ref(db, `comunidad/reportes/${id}`), { estado });
+    update(dbRef(db, `comunidad/reportes/${id}`), { estado });
 
   return { reportes, loading, publicar, actualizarEstado };
 }

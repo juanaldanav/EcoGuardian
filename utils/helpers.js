@@ -12,13 +12,12 @@ export function getInfo(pm25) {
   return                          { label:"Peligroso", color:C.purple, bg:C.purple +"15", emoji:"🟣", score: 500                       };
 }
 
-// true si el dispositivo mandó datos hace menos de 2 minutos con NTP real
-export function isDeviceOnline(ts) {
-  if (!ts || ts < 1_000_000_000) return false;
-  return (Date.now() / 1000 - ts) < 120;
+// true si Firebase empujó datos hace menos de 2 minutos (usa receivedAt del hook, no el timestamp del ESP32)
+export function isDeviceOnline(receivedAt) {
+  if (!receivedAt) return false;
+  return (Date.now() / 1000 - receivedAt) < 120;
 }
 
-// Tiempo desde un timestamp NTP real; null si el timestamp es uptime del ESP32
 export function timeSince(ts) {
   if (!ts || ts < 1_000_000_000) return null;
   const secs = Math.floor(Date.now() / 1000 - ts);
@@ -30,9 +29,15 @@ export function timeSince(ts) {
   return `${Math.floor(h / 24)} d`;
 }
 
-// Formatea timestamp a hora legible
+// Formatea timestamp: hora real si es NTP, tiempo desde arranque si es uptime
 export function fmtTime(ts) {
   if (!ts) return "--:--";
-  const d = new Date(parseInt(ts) * 1000);
+  const n = parseInt(ts);
+  if (n < 1_000_000_000) {
+    // uptime en segundos → mostrar como T+Xm
+    const m = Math.floor(n / 60);
+    return `T+${m}m`;
+  }
+  const d = new Date(n * 1000);
   return d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
 }

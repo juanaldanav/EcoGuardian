@@ -7,8 +7,9 @@ import { db } from "../constants/firebase";
 
 // Hook: datos en tiempo real de la estación
 export function useStation() {
-  const [data, setData]     = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
+  const [, setTick]           = useState(0);
 
   useEffect(() => {
     const r = ref(db, "estaciones/estacion_01");
@@ -17,6 +18,13 @@ export function useStation() {
       setLoading(false);
     });
     return () => unsub();
+  }, []);
+
+  // Fuerza re-render cada 30 s para que isDeviceOnline() recalcule
+  // aunque el dispositivo esté apagado y Firebase no mande datos nuevos
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 30_000);
+    return () => clearInterval(t);
   }, []);
 
   return { data, loading };

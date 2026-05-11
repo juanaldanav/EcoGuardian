@@ -100,7 +100,7 @@ export default function ScreenMapa() {
           {/* Marcador — usa coords del estado para moverse */}
           <Marker
             coordinate={{ latitude:coords.lat, longitude:coords.lng }}
-            title={data?.nombre || "AeroCentinela"}
+            title={data?.nombre || "EcoGuardian"}
             description={`PM2.5: ${(data?.pm25||0).toFixed(1)} µg/m³ — ${info.label}`}
             tracksViewChanges={true}
           >
@@ -131,8 +131,9 @@ export default function ScreenMapa() {
           />
           <Text style={[ss.gpsBadgeTxt, { color: data?.gps_valido ? "#fff" : C.text3 }]}>
             {data?.gps_valido
-              ? `GPS real · ${data?.satelites||0} sats`
-              : "Ubicación por defecto"
+              ? `GPS · ${data?.satelites||0} sats`
+              : data?.lat ? "Última posición"
+              : "Sin GPS"
             }
           </Text>
         </View>
@@ -150,8 +151,9 @@ export default function ScreenMapa() {
           <View style={ss.gpsSinSenal}>
             <MaterialCommunityIcons name="satellite-variant" size={14} color={C.orange} />
             <Text style={ss.gpsSinSenalTxt}>
-              GPS buscando señal — mostrando ubicación por defecto de Culiacán.
-              Pon el dispositivo afuera para obtener coordenadas reales.
+              {data?.lat
+                ? "Sin fix GPS — mostrando última posición registrada del dispositivo."
+                : "GPS buscando señal — sin posición aún."}
             </Text>
           </View>
         )}
@@ -187,9 +189,9 @@ export default function ScreenMapa() {
         <SensorRow
           icon="clock-outline"
           label="Última actualización"
-          value={timeSince(data?.timestamp) ?? "Sin datos"}
+          value={timeSince(data?.receivedAt) ?? "Sin datos"}
           unit=""
-          color={isDeviceOnline(data?.timestamp) ? C.text2 : C.text3}
+          color={isDeviceOnline(data?.receivedAt) ? C.text2 : C.text3}
         />
       </Card>
 

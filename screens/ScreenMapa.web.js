@@ -154,7 +154,7 @@ export default function ScreenMapa() {
         <SensorRow icon="crosshairs-gps"    label="Longitud"             value={Math.abs(lng).toFixed(6)} unit="°O"         color={data?.gps_valido ? C.green : C.text3} />
         <SensorRow icon="satellite-variant" label="Satélites"            value={data?.satelites || 0}      unit="conectados" color={data?.gps_valido ? C.green : C.text3} />
         <SensorRow icon="map-marker"        label="Estación"             value={data?.nombre || "Estacion 1"} unit=""       color={C.green} />
-        <SensorRow icon="clock-outline"     label="Última actualización" value={timeSince(data?.timestamp) ?? "Sin datos"} unit="" color={isDeviceOnline(data?.timestamp) ? C.text2 : C.text3} />
+        <SensorRow icon="clock-outline"     label="Última actualización" value={timeSince(data?.receivedAt) ?? "Sin datos"} unit="" color={isDeviceOnline(data?.receivedAt) ? C.text2 : C.text3} />
       </Card>
 
       <View style={{ height: 24 }} />

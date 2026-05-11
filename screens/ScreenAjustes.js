@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Switch,
-  TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator,
+  TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator, Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -102,7 +102,7 @@ export default function ScreenAjustes() {
   const { data }                    = useStation();
   const { redes, agregar, eliminar } = useWifiNetworks();
   const { user, perfil, isAdmin, login, logout } = useAuth();
-  const online = isDeviceOnline(data?.timestamp);
+  const online = isDeviceOnline(data?.receivedAt);
   const [notifAlertas, setNotifAlertas] = useState(false);
   const [modalRed, setModalRed]     = useState(false);
   const alertaActivaRef             = useRef(false);
@@ -180,6 +180,10 @@ export default function ScreenAjustes() {
   }
 
   function handleLogout() {
+    if (Platform.OS === "web") {
+      logout();
+      return;
+    }
     Alert.alert("Cerrar sesión", `¿Salir como ${perfil?.nombre}?`, [
       { text: "Cancelar" },
       { text: "Salir", style: "destructive", onPress: () => logout() },
@@ -189,7 +193,7 @@ export default function ScreenAjustes() {
   function probarAlerta() {
     Alert.alert(
       "Prueba de Alerta",
-      `Las alertas están funcionando correctamente.\n\nEstación: ${data?.nombre || "Centro Culiacán"}\nPM2.5 actual: ${(data?.pm25||0).toFixed(1)} µg/m³\nNivel: ${info.label}`,
+      `Las alertas están funcionando correctamente.\n\nEstación: ${data?.nombre || "estacion_01"}\nPM2.5 actual: ${(data?.pm25||0).toFixed(1)} µg/m³\nNivel: ${info.label}`,
       [{ text: "Cerrar", style: "default" }]
     );
   }
@@ -288,7 +292,7 @@ export default function ScreenAjustes() {
           sub={online ? "estacion_01 — En línea" : "estacion_01 — Sin conexión"}
           right={
             <View style={[ss.nivelBadge, { backgroundColor:info.color+"22", borderColor:info.color+"44" }]}>
-              <Text style={[ss.nivelTxt, { color:info.color }]}>{info.emoji} {info.label}</Text>
+              <Text style={[ss.nivelTxt, { color:info.color }]}>{info.label}</Text>
             </View>
           }
         />
@@ -297,10 +301,10 @@ export default function ScreenAjustes() {
         <Row
           icon="time-outline"
           label="Última actualización"
-          sub={isDeviceOnline(data?.timestamp) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
+          sub={isDeviceOnline(data?.receivedAt) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
           right={
-            <Text style={[ss.gris, !isDeviceOnline(data?.timestamp) && { color:C.text3 }]}>
-              {timeSince(data?.timestamp) ? `hace ${timeSince(data?.timestamp)}` : "Sin datos"}
+            <Text style={[ss.gris, !isDeviceOnline(data?.receivedAt) && { color:C.text3 }]}>
+              {timeSince(data?.receivedAt) ? `hace ${timeSince(data?.receivedAt)}` : "Sin datos"}
             </Text>
           }
         />
@@ -367,8 +371,8 @@ export default function ScreenAjustes() {
         </View>
       )}
 
-      {/* ── REDES WIFI ──────────────────────────────── */}
-      <Card style={ss.card}>
+      {/* ── REDES WIFI — solo admin ─────────────────── */}
+      {isAdmin && <Card style={ss.card}>
         <View style={ss.wifiHeader}>
           <Text style={ss.sectionTitle}>Redes WiFi del dispositivo</Text>
           <TouchableOpacity onPress={() => setModalRed(true)} style={ss.addBtn}>
@@ -405,6 +409,8 @@ export default function ScreenAjustes() {
             ))
         }
       </Card>
+
+      }
 
       <View style={{ height: 24 }} />
 
