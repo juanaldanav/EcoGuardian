@@ -236,17 +236,40 @@ void setup() {
   while (!ccs.available()) delay(100);
   Serial.println("[2/4] CCS811 OK");
 
-  // WiFiManager — conecta a red guardada o levanta portal de configuración
-  Serial.println("[3/4] Iniciando WiFiManager...");
-  WiFiManager wm;
-  wm.setConfigPortalTimeout(180);   // portal disponible 3 min, luego continúa sin WiFi
-  wm.setConnectTimeout(20);
+  // WiFi: intenta redes conocidas primero, luego abre portal si ninguna conecta
+  Serial.println("[3/4] Conectando WiFi...");
 
-  bool conectado = wm.autoConnect("EcoGuardian-Config");
-  if (conectado) {
-    Serial.printf("      WiFi OK — IP: %s\n", WiFi.localIP().toString().c_str());
-  } else {
-    Serial.println("      Sin WiFi — modo solo local");
+  // Redes que el dispositivo ya conoce — agrega las tuyas aquí
+  const char* SSIDS[] =  { "RedHumberto" };
+  const char* PASSWDS[] = { "12345678"   };
+  const int   N_REDES   = 1;
+
+  bool conectado = false;
+  for (int i = 0; i < N_REDES && !conectado; i++) {
+    Serial.printf("      Intentando: %s", SSIDS[i]);
+    WiFi.begin(SSIDS[i], PASSWDS[i]);
+    for (int t = 0; t < 20 && WiFi.status() != WL_CONNECTED; t++) {
+      delay(500);  Serial.print(".");
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+      conectado = true;
+      Serial.printf(" OK  (IP: %s)\n", WiFi.localIP().toString().c_str());
+    } else {
+      WiFi.disconnect();
+      Serial.println(" Sin respuesta");
+    }
+  }
+
+  // Si ninguna conocida conectó → portal de configuración 3 minutos
+  if (!conectado) {
+    Serial.println("      Abriendo portal: conectate al hotspot 'EcoGuardian-Config'");
+    WiFiManager wm;
+    wm.setConfigPortalTimeout(180);
+    conectado = wm.autoConnect("EcoGuardian-Config");
+    if (conectado)
+      Serial.printf("      WiFi OK via portal (IP: %s)\n", WiFi.localIP().toString().c_str());
+    else
+      Serial.println("      Sin WiFi — modo solo local");
   }
 
   // NTP
