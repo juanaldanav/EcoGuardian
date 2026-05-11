@@ -17,18 +17,20 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 const LAT_DEFAULT = 24.7931;
 const LNG_DEFAULT = -107.3939;
 
-// Estilo oscuro del mapa
+// Estilo claro minimalista del mapa
 const MAP_STYLE = [
-  { elementType:"geometry",            stylers:[{ color:"#0d1a0f" }] },
-  { elementType:"labels.text.fill",    stylers:[{ color:"#4a6b4e" }] },
-  { elementType:"labels.text.stroke",  stylers:[{ color:"#0d1a0f" }] },
-  { featureType:"road", elementType:"geometry",        stylers:[{ color:"#1a2e1e" }] },
-  { featureType:"road", elementType:"geometry.stroke", stylers:[{ color:"#0d1a0f" }] },
-  { featureType:"road.highway", elementType:"geometry",stylers:[{ color:"#1e3d24" }] },
-  { featureType:"water",        elementType:"geometry", stylers:[{ color:"#0d1a0f" }] },
-  { featureType:"poi",          elementType:"geometry", stylers:[{ color:"#111a14" }] },
-  { featureType:"transit",      elementType:"geometry", stylers:[{ color:"#111a14" }] },
-  { featureType:"administrative",elementType:"geometry",stylers:[{ color:"#1a2e1e" }] },
+  { elementType:"geometry",            stylers:[{ color:"#f8faf8" }] },
+  { elementType:"labels.text.fill",    stylers:[{ color:"#4a6b52" }] },
+  { elementType:"labels.text.stroke",  stylers:[{ color:"#ffffff" }] },
+  { featureType:"road", elementType:"geometry",        stylers:[{ color:"#ffffff" }] },
+  { featureType:"road", elementType:"geometry.stroke", stylers:[{ color:"#dce8dc" }] },
+  { featureType:"road.highway", elementType:"geometry",stylers:[{ color:"#f0f5f0" }] },
+  { featureType:"road.highway", elementType:"geometry.stroke", stylers:[{ color:"#dce8dc" }] },
+  { featureType:"water",        elementType:"geometry", stylers:[{ color:"#c8dff0" }] },
+  { featureType:"poi",          elementType:"geometry", stylers:[{ color:"#eef4ee" }] },
+  { featureType:"poi.park",     elementType:"geometry", stylers:[{ color:"#dceede" }] },
+  { featureType:"transit",      elementType:"geometry", stylers:[{ color:"#f4f8f4" }] },
+  { featureType:"administrative",elementType:"geometry",stylers:[{ color:"#dce8dc" }] },
 ];
 
 export default function ScreenMapa() {
@@ -113,7 +115,7 @@ export default function ScreenMapa() {
 
         {/* Badge nivel */}
         <View style={[ss.mapBadge, { backgroundColor:info.color+"EE" }]}>
-          <Text style={ss.mapBadgeTxt}>{info.emoji} {info.label}</Text>
+          <Text style={ss.mapBadgeTxt}>{info.label}</Text>
           <Text style={ss.mapBadgeSub}>PM2.5: {(data?.pm25||0).toFixed(1)} µg/m³</Text>
         </View>
 
@@ -129,7 +131,7 @@ export default function ScreenMapa() {
           />
           <Text style={[ss.gpsBadgeTxt, { color: data?.gps_valido ? "#fff" : C.text3 }]}>
             {data?.gps_valido
-              ? `✓ GPS real · ${data?.satelites||0} sats`
+              ? `GPS real · ${data?.satelites||0} sats`
               : "Ubicación por defecto"
             }
           </Text>
@@ -198,7 +200,9 @@ export default function ScreenMapa() {
 
 const ss = StyleSheet.create({
   mapWrap:      { height:300, marginHorizontal:16, marginTop:4, marginBottom:12,
-                  borderRadius:16, overflow:"hidden", borderWidth:1, borderColor:C.border },
+                  borderRadius:16, overflow:"hidden", position:"relative",
+                  shadowColor:"#1C2B1E", shadowOffset:{width:0,height:3},
+                  shadowOpacity:.08, shadowRadius:10, elevation:3 },
   map:          { flex:1 },
   markerWrap:   { alignItems:"center", shadowOffset:{width:0,height:4},
                   shadowOpacity:.5, shadowRadius:8, elevation:8 },
@@ -220,7 +224,6 @@ const ss = StyleSheet.create({
                   marginBottom:12 },
   cardTitle:    { fontSize:13, fontWeight:"700", color:C.text },
   gpsSinSenal:  { flexDirection:"row", alignItems:"flex-start", gap:8,
-                  backgroundColor:C.orange+"15", borderRadius:10, padding:10,
-                  marginBottom:10, borderWidth:1, borderColor:C.orange+"33" },
-  gpsSinSenalTxt:{ flex:1, fontSize:11, color:C.orange, lineHeight:16 },
+                  paddingVertical:8, marginBottom:8 },
+  gpsSinSenalTxt:{ flex:1, fontSize:11, color:C.text3, lineHeight:16 },
 });

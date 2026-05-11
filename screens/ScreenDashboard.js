@@ -16,6 +16,7 @@ import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
+import { F } from "../constants/fonts";
 
 // ── Componente: Modal de resumen ─────────────────────────────
 function ResumenModal({ visible, onClose, data, hist }) {
@@ -124,14 +125,25 @@ export default function ScreenDashboard() {
   const { hist }          = useHistory();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const pulseAnim  = useRef(new Animated.Value(1)).current;
+  const fadeAnim   = useRef(new Animated.Value(0)).current;
+  const radarScale = useRef(new Animated.Value(1)).current;
+  const radarOpac  = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
+    // Hero button gentle breath
     Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue:1.07, duration:1400, useNativeDriver:true }),
-      Animated.timing(pulseAnim, { toValue:1,    duration:1400, useNativeDriver:true }),
+      Animated.timing(pulseAnim, { toValue: 1.05, duration: 1600, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1,    duration: 1600, useNativeDriver: true }),
     ])).start();
+
+    // Radar ping ring
+    Animated.loop(
+      Animated.parallel([
+        Animated.timing(radarScale, { toValue: 1.9, duration: 2000, useNativeDriver: true }),
+        Animated.timing(radarOpac,  { toValue: 0,   duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
 
   useEffect(() => {
@@ -144,53 +156,56 @@ export default function ScreenDashboard() {
   return (
     <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false}>
 
-      {/* ── HERO BUTTON ────────────────────────────── */}
+      {/* ── HERO — número grande ─────────────────────── */}
       <View style={ss.heroWrap}>
-        <Text style={ss.heroTitle}>Dispositivo</Text>
-        <Animated.View style={{ transform:[{ scale:pulseAnim }] }}>
-          <TouchableOpacity
-            style={[ss.heroBtn, { backgroundColor:info.color, shadowColor:info.color }]}
-            activeOpacity={0.85}
-            onPress={() => setModalVisible(true)}
-          >
-            {loading
-              ? <ActivityIndicator size="large" color="#fff" />
-              : <>
-                  <MaterialCommunityIcons name="radar" size={36} color="#fff" />
-                  <Text style={ss.heroBtnTxt}>Escanear{"\n"}Ahora</Text>
-                </>
-            }
-          </TouchableOpacity>
+
+        {/* Indicador EN VIVO */}
+        <View style={ss.liveBadge}>
+          <Animated.View style={[ss.liveDot, { backgroundColor: info.color, opacity: pulseAnim }]} />
+          <Text style={[ss.liveTxt, { color: info.color }]}>EN VIVO</Text>
+        </View>
+
+        {/* Nivel */}
+        <Text style={[ss.heroLevel, { color: info.color }]}>{info.label}</Text>
+
+        {/* Número PM2.5 */}
+        <Animated.View style={{ opacity: fadeAnim }}>
+          {loading
+            ? <ActivityIndicator size="large" color={info.color} style={{ marginVertical: 16 }} />
+            : <Text style={[ss.heroNum, { color: info.color }]}>
+                {pm25 < 10 ? pm25.toFixed(1) : Math.round(pm25)}
+              </Text>
+          }
         </Animated.View>
-        <Text style={ss.heroSub}>Monitorear Entorno</Text>
+        <Text style={ss.heroUnit}>µg/m³ · PM2.5</Text>
+
+        {/* Botón escanear — outline plano */}
+        <TouchableOpacity
+          style={[ss.heroScanBtn, { borderColor: info.color }]}
+          activeOpacity={0.75}
+          onPress={() => setModalVisible(true)}
+        >
+          <MaterialCommunityIcons name="chart-bar" size={16} color={info.color} />
+          <Text style={[ss.heroScanTxt, { color: info.color }]}>Ver analíticas</Text>
+        </TouchableOpacity>
+
       </View>
 
-      {/* ── 2 TARJETAS (sin batería) ─────────────────── */}
+      {/* ── 2 TARJETAS ───────────────────────────────── */}
       <Animated.View style={[ss.gridRow, { opacity:fadeAnim }]}>
-        <View style={[ss.miniCard, { borderColor:info.color+"44" }]}>
-          <MaterialCommunityIcons name="air-filter" size={22} color={info.color} />
-          <Text style={ss.miniLabel}>Calidad de Aire</Text>
-          <Text style={[ss.miniVal, { color:info.color }]}>{info.emoji} {info.label}</Text>
-          <Text style={[ss.miniSub, { color:info.color }]}>PM2.5: {pm25.toFixed(1)} µg/m³</Text>
+        <View style={[ss.miniCard, { borderColor:C.green+"33" }]}>
+          <MaterialCommunityIcons name="molecule-co2" size={22} color={C.text2} />
+          <Text style={ss.miniLabel}>CO₂</Text>
+          <Text style={[ss.miniVal, { color:C.text }]}>{Math.round(data?.co2 || 0)}</Text>
+          <Text style={ss.miniSub}>ppm</Text>
         </View>
-        <View style={[ss.miniCard, { borderColor:C.text3+"44" }]}>
+        <View style={[ss.miniCard, { borderColor:C.text3+"33" }]}>
           <MaterialCommunityIcons name="sync" size={22} color={C.text2} />
-          <Text style={ss.miniLabel}>Último Sync</Text>
+          <Text style={ss.miniLabel}>Último sync</Text>
           <Text style={[ss.miniVal, { color:C.text2 }]}>{timeSince(data?.timestamp, data?.receivedAt)}</Text>
-          <Text style={ss.miniSub}>{hist?.length || 0} lecturas guardadas</Text>
+          <Text style={ss.miniSub}>{hist?.length || 0} lecturas</Text>
         </View>
       </Animated.View>
-
-      {/* ── BOTÓN VER ANALÍTICAS ────────────────────── */}
-      <TouchableOpacity
-        style={[ss.analyticsBtn, { borderColor:info.color }]}
-        activeOpacity={0.8}
-        onPress={() => setModalVisible(true)}
-      >
-        <MaterialCommunityIcons name="chart-line" size={18} color={info.color} />
-        <Text style={[ss.analyticsTxt, { color:info.color }]}>Ver analíticas</Text>
-        <MaterialCommunityIcons name="arrow-right" size={16} color={info.color} />
-      </TouchableOpacity>
 
       {/* ── SENSORES EN TIEMPO REAL ─────────────────── */}
       {data && (
@@ -250,49 +265,62 @@ export default function ScreenDashboard() {
 }
 
 const ss = StyleSheet.create({
-  heroWrap:     { alignItems:"center", paddingVertical:28, paddingHorizontal:20 },
-  heroTitle:    { fontSize:22, fontWeight:"800", color:C.text, marginBottom:20 },
-  heroBtn:      { width:130, height:130, borderRadius:65, alignItems:"center", justifyContent:"center",
-                  gap:6, shadowOffset:{width:0,height:0}, shadowOpacity:.5, shadowRadius:30, elevation:12 },
-  heroBtnTxt:   { fontSize:15, fontWeight:"700", color:"#fff", textAlign:"center", lineHeight:20 },
-  heroSub:      { fontSize:13, color:C.text2, marginTop:14 },
-  gridRow:      { flexDirection:"row", gap:12, paddingHorizontal:16, marginBottom:12 },
-  miniCard:     { flex:1, backgroundColor:C.card, borderRadius:14, padding:14,
-                  borderWidth:1, alignItems:"center", gap:4 },
-  miniLabel:    { fontSize:9, color:C.text2, textAlign:"center", fontWeight:"600", marginTop:4 },
-  miniVal:      { fontSize:13, fontWeight:"800", textAlign:"center" },
-  miniSub:      { fontSize:9, color:C.text3, textAlign:"center" },
-  analyticsBtn: { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10,
-                  marginHorizontal:16, marginBottom:12, paddingVertical:14,
-                  borderRadius:16, backgroundColor:C.card, borderWidth:1 },
-  analyticsTxt: { fontSize:15, fontWeight:"700" },
-  sensorCard:   { marginHorizontal:16, marginBottom:12 },
-  cardHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
-  cardTitle:    { fontSize:13, fontWeight:"700", color:C.text },
-  alertBanner:  { marginHorizontal:16, marginBottom:12, backgroundColor:"#4D000033",
-                  borderRadius:16, padding:16, borderWidth:1, borderColor:C.red+"66" },
-  alertTitle:   { fontSize:14, fontWeight:"800", color:"#FF6B6B", marginBottom:6 },
-  alertDesc:    { fontSize:12, color:"#FFA5A5", lineHeight:18 },
+  heroWrap:      { alignItems:"center", paddingTop:32, paddingBottom:24, paddingHorizontal:20 },
+  liveBadge:     { flexDirection:"row", alignItems:"center", gap:6, marginBottom:12 },
+  liveDot:       { width:7, height:7, borderRadius:3.5 },
+  liveTxt:       { fontFamily:"JetBrainsMono_400Regular", fontSize:10, letterSpacing:2 },
+  heroLevel:     { fontFamily:"Outfit_700Bold", fontSize:22, marginBottom:4 },
+  heroNum:       { fontFamily:"JetBrainsMono_400Regular", fontSize:80, lineHeight:88,
+                   fontWeight:"700", includeFontPadding:false },
+  heroUnit:      { fontFamily:"Outfit_400Regular", fontSize:13, color:C.text3, marginTop:4, marginBottom:24 },
+  heroScanBtn:   { flexDirection:"row", alignItems:"center", gap:8, paddingHorizontal:20,
+                   paddingVertical:10, borderRadius:24, borderWidth:1.5 },
+  heroScanTxt:   { fontFamily:"Outfit_600SemiBold", fontSize:14 },
+  gridRow:       { flexDirection:"row", gap:12, paddingHorizontal:16, marginBottom:12 },
+  miniCard:      { flex:1, backgroundColor:C.card, borderRadius:14, padding:14,
+                   alignItems:"center", gap:4,
+                   shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},
+                   shadowOpacity:.07, shadowRadius:8, elevation:2 },
+  miniLabel:     { fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2, textAlign:"center", marginTop:4 },
+  miniVal:       { fontFamily:"Outfit_700Bold", fontSize:14, textAlign:"center" },
+  miniSub:       { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3, textAlign:"center" },
+  analyticsBtn:  { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:10,
+                   marginHorizontal:16, marginBottom:12, paddingVertical:14,
+                   borderRadius:16, backgroundColor:C.card,
+                   shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},
+                   shadowOpacity:.07, shadowRadius:8, elevation:2 },
+  analyticsTxt:  { fontFamily:"Outfit_600SemiBold", fontSize:14 },
+  sensorCard:    { marginHorizontal:16, marginBottom:12 },
+  cardHeader:    { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
+  cardTitle:     { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
+  alertBanner:  { marginHorizontal:16, marginBottom:12, backgroundColor:C.card,
+                  borderRadius:16, padding:16,
+                  shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},
+                  shadowOpacity:.07, shadowRadius:8, elevation:2 },
+  alertTitle:   { fontSize:14, fontWeight:"800", color:C.red, marginBottom:6 },
+  alertDesc:    { fontSize:12, color:C.text, lineHeight:18 },
   // Modal
-  modalOverlay: { flex:1, backgroundColor:"rgba(0,0,0,.7)", justifyContent:"center",
+  modalOverlay: { flex:1, backgroundColor:"rgba(28,43,30,.55)", justifyContent:"center",
                   alignItems:"center", padding:20 },
   modalBox:     { backgroundColor:C.card, borderRadius:20, padding:20, width:"100%",
-                  borderWidth:1, borderColor:C.border },
+                  borderWidth:1, borderColor:C.border,
+                  shadowColor:"#1C2B1E", shadowOffset:{width:0,height:8},
+                  shadowOpacity:.12, shadowRadius:24, elevation:12 },
   modalHeader:  { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:16 },
-  modalTitle:   { fontSize:15, fontWeight:"800", color:C.text },
-  closeBtn:     { width:30, height:30, borderRadius:8, backgroundColor:C.bg,
+  modalTitle:   { fontFamily:"Outfit_700Bold", fontSize:15, color:C.text },
+  closeBtn:     { width:30, height:30, borderRadius:8, backgroundColor:C.bg3,
                   alignItems:"center", justifyContent:"center" },
   modalSection: { marginBottom:16 },
-  modalSub:     { fontSize:9, color:C.text3, letterSpacing:.1, fontWeight:"700",
-                  marginBottom:8, textTransform:"uppercase" },
+  modalSub:     { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3,
+                  letterSpacing:2, marginBottom:8, textTransform:"uppercase" },
   nivelBox:     { flexDirection:"row", alignItems:"center", padding:14,
                   borderRadius:12, borderWidth:1 },
-  nivelLabel:   { fontSize:20, fontWeight:"800" },
+  nivelLabel:   { fontFamily:"Outfit_700Bold", fontSize:20 },
   promediosGrid:{ flexDirection:"row", gap:8 },
-  promedioCard: { flex:1, backgroundColor:C.bg, borderRadius:12, padding:10,
+  promedioCard: { flex:1, backgroundColor:C.bg2, borderRadius:12, padding:10,
                   alignItems:"center", gap:4, borderWidth:1 },
-  promedioVal:  { fontSize:18, fontWeight:"800" },
-  promedioUnit: { fontSize:9, color:C.text3 },
-  promedioLabel:{ fontSize:9, color:C.text2, fontWeight:"600" },
+  promedioVal:  { fontFamily:"JetBrainsMono_400Regular", fontSize:18, fontWeight:"800" },
+  promedioUnit: { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
+  promedioLabel:{ fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2 },
   modalCloseBtn:{ paddingVertical:12, borderRadius:12, alignItems:"center", marginTop:4 },
 });

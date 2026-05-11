@@ -5,11 +5,11 @@ import { C } from "../constants/colors";
 
 // Devuelve info del nivel según PM2.5
 export function getInfo(pm25) {
-  if (!pm25 || pm25 <= 12) return { label:"Bueno",     color:C.green,  bg:"#1A4D2E", emoji:"🟢", score: Math.round((pm25||0)*4)  };
-  if (pm25 <= 35)          return { label:"Moderado",  color:C.yellow, bg:"#4D3A00", emoji:"🟡", score: Math.round(pm25*3)        };
-  if (pm25 <= 55)          return { label:"Malo",      color:C.orange, bg:"#4D2600", emoji:"🟠", score: Math.round(pm25*2)        };
-  if (pm25 <= 150)         return { label:"Muy malo",  color:C.red,    bg:"#4D0000", emoji:"🔴", score: Math.min(300,Math.round(pm25)) };
-  return                          { label:"Peligroso", color:C.purple, bg:"#2D004D", emoji:"🟣", score: 500                       };
+  if (!pm25 || pm25 <= 12) return { label:"Bueno",     color:C.green,  bg:C.green  +"15", emoji:"🟢", score: Math.round((pm25||0)*4)  };
+  if (pm25 <= 35)          return { label:"Moderado",  color:C.yellow, bg:C.yellow +"15", emoji:"🟡", score: Math.round(pm25*3)        };
+  if (pm25 <= 55)          return { label:"Malo",      color:C.orange, bg:C.orange +"15", emoji:"🟠", score: Math.round(pm25*2)        };
+  if (pm25 <= 150)         return { label:"Muy malo",  color:C.red,    bg:C.red    +"15", emoji:"🔴", score: Math.min(300,Math.round(pm25)) };
+  return                          { label:"Peligroso", color:C.purple, bg:C.purple +"15", emoji:"🟣", score: 500                       };
 }
 
 // Tiempo desde un timestamp en segundos

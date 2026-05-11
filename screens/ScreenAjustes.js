@@ -14,6 +14,7 @@ import Card from "../components/Card";
 import { useStation } from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
+import { F } from "../constants/fonts";
 
 // ── Fila reutilizable ────────────────────────────────────────
 function Row({ icon, label, sub, right, onPress }) {
@@ -36,7 +37,7 @@ function Row({ icon, label, sub, right, onPress }) {
 }
 
 // ── Pantalla Ajustes ─────────────────────────────────────────
-export default function ScreenAjustes({ setDarkMode, darkMode }) {
+export default function ScreenAjustes() {
   const { data }                    = useStation();
   const [notifAlertas, setNotifAlertas] = useState(false);
   const alertaActivaRef             = useRef(false);
@@ -167,22 +168,6 @@ export default function ScreenAjustes({ setDarkMode, darkMode }) {
         />
         <View style={ss.div} />
 
-        {/* Modo oscuro */}
-        <Row
-          icon="moon-outline"
-          label="Modo oscuro"
-          sub="Tema de la aplicación"
-          right={
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false:C.border, true:C.green+"88" }}
-              thumbColor={darkMode ? C.green : C.text3}
-            />
-          }
-        />
-        <View style={ss.div} />
-
         {/* Probar alerta */}
         <Row
           icon="notifications-outline"
@@ -218,29 +203,30 @@ export default function ScreenAjustes({ setDarkMode, darkMode }) {
 
 const ss = StyleSheet.create({
   card:            { marginHorizontal:16, marginTop:4, marginBottom:12 },
-  sectionTitle:    { fontSize:13, fontWeight:"800", color:C.text, marginBottom:12 },
+  sectionTitle:    { fontFamily:"Outfit_700Bold", fontSize:13, color:C.text, marginBottom:12 },
   row:             { flexDirection:"row", alignItems:"center", paddingVertical:10, gap:12 },
-  rowIcon:         { width:34, height:34, borderRadius:10, backgroundColor:C.green+"22",
+  rowIcon:         { width:34, height:34, borderRadius:10, backgroundColor:C.green+"18",
                      alignItems:"center", justifyContent:"center" },
-  rowLabel:        { color:C.text, fontSize:13, fontWeight:"600" },
-  rowSub:          { color:C.text3, fontSize:11, marginTop:1, lineHeight:15 },
+  rowLabel:        { fontFamily:"Outfit_600SemiBold", color:C.text, fontSize:13 },
+  rowSub:          { fontFamily:"Outfit_400Regular", color:C.text3, fontSize:11, marginTop:1, lineHeight:15 },
   div:             { height:1, backgroundColor:C.border, marginVertical:2 },
   verde:           { fontSize:12, fontWeight:"700", color:C.green },
   gris:            { fontSize:11, fontWeight:"600", color:C.text2 },
   estadoBadge:     { flexDirection:"row", alignItems:"center", gap:5,
-                     backgroundColor:C.green+"22", paddingHorizontal:10,
-                     paddingVertical:4, borderRadius:10, borderWidth:1, borderColor:C.green+"44" },
+                     backgroundColor:C.green+"15", paddingHorizontal:10,
+                     paddingVertical:4, borderRadius:10 },
   estadoDot:       { width:6, height:6, borderRadius:3, backgroundColor:C.green },
   estadoTxt:       { fontSize:11, fontWeight:"700", color:C.green },
-  nivelBadge:      { paddingHorizontal:10, paddingVertical:4, borderRadius:10, borderWidth:1 },
+  nivelBadge:      { paddingHorizontal:10, paddingVertical:4, borderRadius:10 },
   nivelTxt:        { fontSize:11, fontWeight:"700" },
   probarBtn:       { flexDirection:"row", alignItems:"center", gap:4,
-                     backgroundColor:C.green+"22", paddingHorizontal:10,
-                     paddingVertical:5, borderRadius:8, borderWidth:1, borderColor:C.green+"44" },
+                     backgroundColor:C.green+"12", paddingHorizontal:10,
+                     paddingVertical:5, borderRadius:8 },
   probarTxt:       { fontSize:11, fontWeight:"700", color:C.green },
   activoBanner:    { marginHorizontal:16, marginBottom:12, flexDirection:"row", alignItems:"center",
-                     backgroundColor:C.green+"15", borderRadius:14, padding:14,
-                     borderWidth:1, borderColor:C.green+"44" },
+                     backgroundColor:C.card, borderRadius:14, padding:14,
+                     shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},
+                     shadowOpacity:.07, shadowRadius:8, elevation:2 },
   activoBannerTitle:{ color:C.green, fontSize:13, fontWeight:"700" },
   activoBannerSub: { color:C.text3, fontSize:11, marginTop:2 },
 });

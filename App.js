@@ -1,15 +1,19 @@
 // ============================================================
-//   App.js — Corregido para Android Samsung
-//   - Safe area para status bar y navigation bar
-//   - Sin botón de flecha en el header
+//   App.js — Fuentes brand Outfit + JetBrains Mono
+//   Cross-fade animado entre tabs
 // ============================================================
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, TouchableOpacity, Text, StyleSheet,
-  StatusBar, Platform, Image,
+  StatusBar, Image, Animated,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFonts,
+  Outfit_300Light, Outfit_400Regular,
+  Outfit_600SemiBold, Outfit_700Bold,
+} from "@expo-google-fonts/outfit";
+import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono";
 
 import ScreenDashboard from "./screens/ScreenDashboard";
 import ScreenMapa      from "./screens/ScreenMapa";
@@ -17,6 +21,7 @@ import ScreenAlertas   from "./screens/ScreenAlertas";
 import ScreenHistorial from "./screens/ScreenHistorial";
 import ScreenAjustes   from "./screens/ScreenAjustes";
 import { C } from "./constants/colors";
+import { F } from "./constants/fonts";
 
 const TABS = [
   { key:"home",    icon:"home",          iconO:"home-outline",        label:"Inicio"    },
@@ -26,76 +31,76 @@ const TABS = [
   { key:"settings",icon:"settings-sharp",iconO:"settings-outline",    label:"Ajustes"   },
 ];
 
-// ── Header sin botón de flecha ────────────────────────────────
-function Header({ title }) {
+// ── Header ────────────────────────────────────────────────────
+function Header() {
   return (
     <View style={ss.header}>
       <View style={ss.headerLeft}>
         <View style={ss.logoBox}>
           <Image
-            source={require('./assets/ecoguardian-mark.png')}
-            style={{ width: 24, height: 24, resizeMode: 'contain' }}
+            source={require("./assets/ecoguardian-mark.png")}
+            style={{ width: 22, height: 22, resizeMode: "contain" }}
           />
         </View>
-        <Text style={ss.logoText}>{title}</Text>
+        <View>
+          <Text style={ss.logoText}>
+            <Text style={ss.logoBold}>eco</Text>
+            <Text style={ss.logoLight}>guardian</Text>
+          </Text>
+          <Text style={ss.logoTagline}>NATURALEZA · IOT</Text>
+        </View>
       </View>
     </View>
   );
 }
 
-// ── Layout principal con insets ───────────────────────────────
+// ── Layout ────────────────────────────────────────────────────
 function AppLayout() {
-  const [tab, setTab]           = useState("home");
-  const [darkMode, setDarkMode] = useState(true);
-  const insets                  = useSafeAreaInsets();
+  const [tab, setTab]   = useState("home");
+  const insets          = useSafeAreaInsets();
+  const fadeAnim        = useRef(new Animated.Value(1)).current;
+  const prevTabRef      = useRef("home");
 
-  const bgColor = darkMode ? C.bg : "#F0F4F0";
+  function handleTabPress(key) {
+    if (key === prevTabRef.current) return;
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+    prevTabRef.current = key;
+    setTab(key);
+  }
 
   const renderScreen = () => {
-    switch(tab) {
+    switch (tab) {
       case "home":     return <ScreenDashboard />;
       case "map":      return <ScreenMapa />;
       case "alerts":   return <ScreenAlertas />;
       case "history":  return <ScreenHistorial />;
-      case "settings": return <ScreenAjustes darkMode={darkMode} setDarkMode={setDarkMode} />;
+      case "settings": return <ScreenAjustes />;
       default:         return <ScreenDashboard />;
     }
   };
 
   return (
-    <View style={[ss.root, { backgroundColor:bgColor }]}>
-      {/* Rellena el espacio del status bar de arriba */}
-      <View style={{ height:insets.top, backgroundColor:bgColor }} />
+    <View style={[ss.root, { backgroundColor: C.bg }]}>
+      <View style={{ height: insets.top, backgroundColor: C.bg }} />
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} translucent={false} />
 
-      <StatusBar
-        barStyle={darkMode ? "light-content" : "dark-content"}
-        backgroundColor={bgColor}
-        translucent={false}
-      />
+      <Header />
 
-      <Header title="EcoGuardian" />
-
-      {/* Contenido de la pantalla */}
-      <View style={{ flex:1, backgroundColor:bgColor }}>
+      <Animated.View style={{ flex: 1, opacity: fadeAnim, backgroundColor: C.bg }}>
         {renderScreen()}
-      </View>
+      </Animated.View>
 
-      {/* Barra de navegación inferior */}
-      <View style={[
-        ss.bottomNav,
-        {
-          backgroundColor: darkMode ? C.bg2 : "#E8F0E8",
-          // Rellena el espacio de los botones del teléfono
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
-        }
-      ]}>
+      <View style={[ss.bottomNav, { backgroundColor: C.bg2, paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
         {TABS.map(t => {
           const active = tab === t.key;
           return (
             <TouchableOpacity
               key={t.key}
               style={ss.navBtn}
-              onPress={() => setTab(t.key)}
+              onPress={() => handleTabPress(t.key)}
               activeOpacity={0.7}
             >
               <View style={[ss.navIconWrap, active && ss.navIconActive]}>
@@ -105,22 +110,38 @@ function AppLayout() {
                   color={active ? C.green : C.text3}
                 />
               </View>
-              <Text style={[ss.navLabel, active && { color:C.green }]}>
+              <Text style={[ss.navLabel, active && { color: C.green, fontFamily: F.semi }]}>
                 {t.label}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
-
-      {/* Rellena el espacio extra si hay barra de gestos */}
-      <View style={{ height: insets.bottom > 0 ? 0 : 0, backgroundColor:bgColor }} />
     </View>
   );
 }
 
-// ── App envuelta en SafeAreaProvider ─────────────────────────
+// ── App ───────────────────────────────────────────────────────
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Outfit_300Light,
+    Outfit_400Regular,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    JetBrainsMono_400Regular,
+  });
+
+  // Si los TTF tardan más de 2.5 s o fallan, renderizamos igual (fallback a sistema)
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!fontsLoaded && !fontError && !timedOut) {
+    return <View style={{ flex: 1, backgroundColor: C.bg }} />;
+  }
+
   return (
     <SafeAreaProvider>
       <AppLayout />
@@ -129,17 +150,25 @@ export default function App() {
 }
 
 const ss = StyleSheet.create({
-  root:         { flex:1 },
-  header:       { flexDirection:"row", alignItems:"center",
-                  paddingHorizontal:20, paddingVertical:14,
-                  borderBottomWidth:1, borderBottomColor:C.border },
-  headerLeft:   { flexDirection:"row", alignItems:"center", gap:10 },
-  logoBox:      { width:36, height:36, borderRadius:10, backgroundColor:C.greenD,
-                  alignItems:"center", justifyContent:"center" },
-  logoText:     { fontSize:18, fontWeight:"800", color:C.text },
-  bottomNav:    { flexDirection:"row", borderTopWidth:1, borderTopColor:C.border, paddingTop:6 },
-  navBtn:       { flex:1, alignItems:"center", gap:3 },
-  navIconWrap:  { padding:4, borderRadius:10 },
-  navIconActive:{ backgroundColor:C.green+"22" },
-  navLabel:     { fontSize:10, color:C.text3, fontWeight:"600" },
+  root:         { flex: 1 },
+  header:       { flexDirection: "row", alignItems: "center",
+                  paddingHorizontal: 20, paddingVertical: 12,
+                  backgroundColor: C.bg,
+                  shadowColor: "#1C2B1E", shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 12 },
+  logoBox:      { width: 38, height: 38, borderRadius: 11, backgroundColor: C.greenD,
+                  alignItems: "center", justifyContent: "center" },
+  logoText:     { fontSize: 20, lineHeight: 24, letterSpacing: 0.3 },
+  logoBold:     { fontFamily: "Outfit_700Bold",  color: C.greenD },
+  logoLight:    { fontFamily: "Outfit_300Light", color: C.greenD },
+  logoTagline:  { fontFamily: "JetBrainsMono_400Regular", fontSize: 9,
+                  letterSpacing: 3, color: C.text3, marginTop: 1 },
+  bottomNav:    { flexDirection: "row", paddingTop: 6,
+                  shadowColor: "#1C2B1E", shadowOffset: { width: 0, height: -1 },
+                  shadowOpacity: 0.05, shadowRadius: 4, elevation: 4 },
+  navBtn:       { flex: 1, alignItems: "center", gap: 3 },
+  navIconWrap:  { padding: 5, borderRadius: 10 },
+  navIconActive:{ backgroundColor: C.green + "18" },
+  navLabel:     { fontSize: 10, color: C.text3, fontFamily: "Outfit_400Regular" },
 });

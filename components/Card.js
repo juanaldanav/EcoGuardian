@@ -14,7 +14,10 @@ const ss = StyleSheet.create({
     backgroundColor: C.card,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: C.border,
+    shadowColor: "#1C2B1E",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
   },
 });

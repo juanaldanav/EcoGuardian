@@ -2,11 +2,12 @@
 //   ScreenHistorial.js — Pantalla de historial y gráfica
 // ============================================================
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import Card from "../components/Card";
 import { useHistory } from "../hooks/useFirebase";
 import { getInfo, fmtTime } from "../utils/helpers";
 import { C } from "../constants/colors";
+import { F } from "../constants/fonts";
 
 export default function ScreenHistorial() {
   const { hist, loading } = useHistory();
@@ -83,7 +84,7 @@ export default function ScreenHistorial() {
 const ss = StyleSheet.create({
   card:       { marginHorizontal:16, marginTop:4, marginBottom:12 },
   cardHeader: { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
-  cardTitle:  { fontSize:13, fontWeight:"700", color:C.text },
+  cardTitle:  { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
   chartWrap:  { height:120, marginTop:8, position:"relative" },
   guia:       { position:"absolute", left:0, right:0, borderTopWidth:1, borderTopColor:C.border+"55" },
   guiaTxt:    { fontSize:9, color:C.text3, marginLeft:2 },
@@ -91,9 +92,9 @@ const ss = StyleSheet.create({
   barWrap:    { flex:1, height:"100%", justifyContent:"flex-end" },
   bar:        { borderRadius:4, minHeight:4 },
   histRow:    { flexDirection:"row", alignItems:"center", paddingVertical:10, gap:8 },
-  histTime:   { fontSize:11, color:C.text3, width:42, fontFamily:Platform.OS==="ios"?"Courier":"monospace" },
-  histPM:     { fontSize:15, fontWeight:"700" },
-  histUnit:   { fontSize:9, color:C.text3 },
+  histTime:   { fontFamily:"JetBrainsMono_400Regular", fontSize:11, color:C.text3, width:46 },
+  histPM:     { fontFamily:"JetBrainsMono_400Regular", fontSize:15, fontWeight:"700" },
+  histUnit:   { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
   histBadge:  { paddingHorizontal:8, paddingVertical:3, borderRadius:8, borderWidth:1 },
-  histBadgeTxt:{ fontSize:10, fontWeight:"700" },
+  histBadgeTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:10 },
 });

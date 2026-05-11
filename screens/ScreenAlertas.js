@@ -10,6 +10,7 @@ import { useStation } from "../hooks/useFirebase";
 import { useAlerts }  from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
+import { F } from "../constants/fonts";
 
 export default function ScreenAlertas() {
   const { data }  = useStation();
@@ -25,7 +26,7 @@ export default function ScreenAlertas() {
           <Text style={ss.cardTitle}>Estado actual</Text>
           <LiveDot />
         </View>
-        <View style={[ss.estadoBox, { backgroundColor:info.color+"15", borderColor:info.color+"44" }]}>
+        <View style={[ss.estadoBox, { backgroundColor:info.color+"10" }]}>
           <Text style={{ fontSize:40 }}>{info.emoji}</Text>
           <View style={{ flex:1, marginLeft:16 }}>
             <Text style={[ss.estadoLabel, { color:info.color }]}>{info.label}</Text>
@@ -96,9 +97,9 @@ export default function ScreenAlertas() {
 const ss = StyleSheet.create({
   card:       { marginHorizontal:16, marginTop:4, marginBottom:12 },
   cardHeader: { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
-  cardTitle:  { fontSize:13, fontWeight:"700", color:C.text },
-  estadoBox:  { flexDirection:"row", alignItems:"center", padding:16, borderRadius:12, borderWidth:1 },
-  estadoLabel:{ fontSize:22, fontWeight:"800" },
+  cardTitle:  { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
+  estadoBox:  { flexDirection:"row", alignItems:"center", padding:16, borderRadius:12 },
+  estadoLabel:{ fontFamily:"Outfit_700Bold", fontSize:22 },
   escalaRow:  { flexDirection:"row", alignItems:"center", paddingVertical:10 },
   alertaRow:  { flexDirection:"row", alignItems:"center", paddingVertical:10, gap:10 },
   alertaIcon: { width:36, height:36, borderRadius:10, alignItems:"center", justifyContent:"center" },
