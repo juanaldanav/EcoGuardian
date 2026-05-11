@@ -1,11 +1,28 @@
 /**
- * inject-web.js — Post-build: inyecta splash + fix iOS zoom en dist/index.html
+ * inject-web.js — Post-build: inyecta splash + fix iOS zoom + PWA meta tags en dist/index.html
+ *                 Copia web-static/{manifest.json,sw.js} a dist/
  * Uso: node scripts/inject-web.js
  */
 const fs   = require("fs");
 const path = require("path");
 
-const distFile = path.join(__dirname, "..", "dist", "index.html");
+const ROOT      = path.join(__dirname, "..");
+const DIST      = path.join(ROOT, "dist");
+const STATIC    = path.join(ROOT, "web-static");
+const distFile  = path.join(DIST, "index.html");
+
+// ── Copiar archivos estáticos de web-static/ a dist/ ────────────
+for (const file of ["manifest.json", "sw.js"]) {
+  const src  = path.join(STATIC, file);
+  const dest = path.join(DIST, file);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest);
+    console.log(`✓ Copiado: web-static/${file} → dist/${file}`);
+  } else {
+    console.warn(`⚠ No encontrado: ${src}`);
+  }
+}
+
 let html = fs.readFileSync(distFile, "utf8");
 
 // ── 1. Fix iOS zoom (inputs con font-size < 16px disparan auto-zoom en Safari)
@@ -93,9 +110,19 @@ const splashHTML = `
   </div>
   <script>setTimeout(function(){var s=document.getElementById('eco-splash');if(s)s.remove();},3200);</script>`;
 
+// ── 5. PWA meta tags + registro del Service Worker ──────────────
+const pwaTags = `
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="apple-touch-icon" href="/assets/pwa/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EcoGuardian">
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(console.error);});}</script>`;
+
 // ── Inyección en el HTML generado por Expo ─────────────────────
-html = html.replace("</head>", `${iosZoomFix}${fonts}${splashCSS}\n</head>`);
+html = html.replace("</head>", `${iosZoomFix}${fonts}${splashCSS}${pwaTags}\n</head>`);
 html = html.replace('<div id="root"></div>', `${splashHTML}\n  <div id="root"></div>`);
 
 fs.writeFileSync(distFile, html, "utf8");
-console.log("✓ inject-web.js: splash + iOS zoom fix inyectados en dist/index.html");
+console.log("✓ inject-web.js: splash + iOS zoom fix + PWA meta tags inyectados en dist/index.html");
