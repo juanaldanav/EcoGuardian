@@ -1,12 +1,19 @@
 /*
  * ============================================================
- *   EcoGuardian Firmware v5.0
- *   Correcciones para presentación:
- *   - NTP: timestamp real en lugar de uptime
- *   - WiFi multi-red: intenta varias redes en orden
+ *   EcoGuardian Firmware v5.1
+ *   - WiFiManager: se configura desde el teléfono, sin tocar código
+ *   - NTP: timestamp Unix real
  *   - gpsValido se resetea cada ciclo
- *   - tvoc incluido en historial
- *   - Nombre de estación consistente
+ *   - tvoc en historial
+ *
+ *   PRIMERA VEZ:
+ *     1. Enciende el ESP32
+ *     2. Conéctate desde tu teléfono al hotspot "EcoGuardian-Config"
+ *     3. Se abre un portal web → elige tu red WiFi e ingresa la contraseña
+ *     4. El ESP32 guarda las credenciales y se conecta solo
+ *     5. La próxima vez arranca directo sin el portal
+ *
+ *   RESETEAR WiFi guardado: conecta el pin RESET_PIN a GND 3 segundos
  * ============================================================
  */
 
@@ -17,26 +24,21 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <WiFiManager.h>          // instalar: "WiFiManager" by tzapu
 
 // ── Firebase ─────────────────────────────────────────────────
 #define FIREBASE_URL   "https://ecoguardian-68553-default-rtdb.firebaseio.com"
 #define STATION_ID     "estacion_01"
 #define STATION_NOMBRE "Estacion Centro Culiacan"
 
-// ── Redes WiFi conocidas — agregar las que necesiten ─────────
-struct RedWifi { const char* ssid; const char* password; };
-const RedWifi REDES[] = {
-  { "RedHumberto",   "12345678"   },   // casa Humberto
-  { "iPhone de Juan","00000000"   },   // hotspot Juan  ← cambiar contraseña
-  { "TecNM_Alumnos", ""           },   // red campus (sin contraseña)
-  { "EcoGuardian",   "ecoguardian"},   // hotspot de emergencia
-};
-const int NUM_REDES = sizeof(REDES) / sizeof(REDES[0]);
+// ── Pin para resetear credenciales WiFi (opcional) ───────────
+// Conecta este pin a GND al encender para olvidar la red guardada
+#define RESET_PIN  0   // botón BOOT del ESP32 — ya viene en la placa
 
-// ── NTP — UTC-7 Culiacán (sin horario de verano) ─────────────
-#define NTP_SERVER   "pool.ntp.org"
-#define GMT_OFFSET   -25200   // -7 h en segundos
-#define DST_OFFSET   0
+// ── NTP — UTC-7 Culiacán ──────────────────────────────────────
+#define NTP_SERVER  "pool.ntp.org"
+#define GMT_OFFSET  -25200
+#define DST_OFFSET  0
 
 // ── Pines ────────────────────────────────────────────────────
 #define SDS_RX  16
@@ -57,16 +59,15 @@ HardwareSerial  gpsSerial(1);
 // ── Variables ────────────────────────────────────────────────
 float  pm25 = 0, pm10 = 0;
 float  co2  = 400, tvoc = 0;
-double lat  = 24.7889, lng = -107.3975;   // default Culiacán
+double lat  = 24.7889, lng = -107.3975;
 int    satelites = 0;
 bool   gpsValido = false;
 byte   buf[10];
 int    bufIdx = 0;
 unsigned long ultimoEnvio = 0;
-bool   wifiOk  = false;
-bool   ntpOk   = false;
+bool   ntpOk = false;
 
-// ── Nivel de calidad del aire ─────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
 String calcularNivel(float pm) {
   if (pm <= 12)  return "bueno";
   if (pm <= 35)  return "moderado";
@@ -83,37 +84,10 @@ int calcularColor(float pm) {
   return 4;
 }
 
-// ── Timestamp real via NTP ────────────────────────────────────
 unsigned long obtenerTimestamp() {
-  if (!ntpOk) return millis() / 1000;   // fallback: uptime si no hay NTP
-  time_t now;
-  time(&now);
+  if (!ntpOk) return millis() / 1000;
+  time_t now;  time(&now);
   return (unsigned long)now;
-}
-
-// ── Conectar WiFi — prueba cada red en orden ─────────────────
-bool conectarWifi() {
-  for (int i = 0; i < NUM_REDES; i++) {
-    Serial.printf("      Intentando: %s ...", REDES[i].ssid);
-    WiFi.begin(REDES[i].ssid, REDES[i].password);
-
-    int intentos = 0;
-    while (WiFi.status() != WL_CONNECTED && intentos < 20) {
-      delay(500);
-      Serial.print(".");
-      intentos++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.printf(" OK  (IP: %s)\n", WiFi.localIP().toString().c_str());
-      return true;
-    }
-
-    Serial.println(" Sin respuesta");
-    WiFi.disconnect();
-    delay(500);
-  }
-  return false;
 }
 
 // ── Enviar a Firebase ─────────────────────────────────────────
@@ -125,7 +99,6 @@ void enviarFirebase() {
   bool   alarma = (pm25 > 35);
   unsigned long ts = obtenerTimestamp();
 
-  // JSON principal
   String json = "{";
   json += "\"pm25\":"       + String(pm25, 1)   + ",";
   json += "\"pm10\":"       + String(pm10, 1)   + ",";
@@ -143,14 +116,13 @@ void enviarFirebase() {
   json += "}";
 
   HTTPClient http;
-  String url = String(FIREBASE_URL) + "/estaciones/" + STATION_ID + ".json";
-  http.begin(url);
+  http.begin(String(FIREBASE_URL) + "/estaciones/" + STATION_ID + ".json");
   http.addHeader("Content-Type", "application/json");
   int code = http.PATCH(json);
-  Serial.printf("%s datos enviados (HTTP %d)\n", code == 200 ? "OK" : "ERR", code);
+  Serial.printf("%s Firebase PATCH (HTTP %d)\n", code == 200 ? "OK" : "ERR", code);
   http.end();
 
-  // Historial — incluye tvoc
+  // Historial con tvoc y timestamp real como clave
   String urlHist = String(FIREBASE_URL) + "/historial/" + STATION_ID + "/" + String(ts) + ".json";
   String jsonHist = "{";
   jsonHist += "\"pm25\":"  + String(pm25, 1) + ",";
@@ -164,7 +136,6 @@ void enviarFirebase() {
   http.PUT(jsonHist);
   http.end();
 
-  // Alerta
   if (alarma) {
     String urlAlerta = String(FIREBASE_URL) + "/alertas/" + String(ts) + ".json";
     String jsonAlerta = "{";
@@ -178,7 +149,7 @@ void enviarFirebase() {
     http.addHeader("Content-Type", "application/json");
     http.PUT(jsonAlerta);
     http.end();
-    Serial.println("ALERTA enviada a Firebase");
+    Serial.println("ALERTA enviada");
   }
 }
 
@@ -202,11 +173,8 @@ void leerSDS011() {
 
 void leerGPS() {
   while (gpsSerial.available()) gps.encode(gpsSerial.read());
-
-  // Reset cada ciclo — si pierde señal, gpsValido vuelve a false
-  gpsValido  = false;
-  satelites  = gps.satellites.isValid() ? gps.satellites.value() : 0;
-
+  gpsValido = false;
+  satelites = gps.satellites.isValid() ? gps.satellites.value() : 0;
   if (gps.location.isValid() && gps.location.age() < 2000) {
     lat      = gps.location.lat();
     lng      = gps.location.lng();
@@ -228,11 +196,10 @@ void imprimirSerial() {
   Serial.printf("| eCO2:   %.0f ppm\n", co2);
   Serial.printf("| TVOC:   %.0f ppb\n", tvoc);
   if (gpsValido)
-    Serial.printf("| GPS:    %.6f, %.6f  (%d sats)\n", lat, lng, satelites);
+    Serial.printf("| GPS:    %.6f, %.6f (%d sats)\n", lat, lng, satelites);
   else
     Serial.printf("| GPS:    Buscando... (%d sats)\n", satelites);
   Serial.printf("| NTP:    %s\n", ntpOk ? "OK" : "Sin sync");
-  Serial.printf("| WiFi:   %s\n", wifiOk ? "Conectado" : "Sin conexion");
   Serial.println("+----------------------------------+");
 }
 
@@ -241,10 +208,21 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n+==============================+");
-  Serial.println("|   EcoGuardian  v5.0          |");
+  Serial.println("|   EcoGuardian  v5.1          |");
   Serial.println("+==============================+\n");
 
-  // UART sensores
+  // Si el botón BOOT está presionado al encender → borra WiFi guardado
+  pinMode(RESET_PIN, INPUT_PULLUP);
+  if (digitalRead(RESET_PIN) == LOW) {
+    Serial.println("! Borrando credenciales WiFi...");
+    WiFiManager wm;
+    wm.resetSettings();
+    Serial.println("  Listo. Suelta el botón y reinicia.");
+    delay(3000);
+    ESP.restart();
+  }
+
+  // UART
   sdsSerial.begin(9600, SERIAL_8N1, SDS_RX, SDS_TX);
   gpsSerial.begin(9600, SERIAL_8N1, GPS_RX, GPS_TX);
   Serial.println("[1/4] UART OK");
@@ -252,30 +230,37 @@ void setup() {
   // CCS811
   Wire.begin(SDA_PIN, SCL_PIN);
   if (!ccs.begin()) {
-    Serial.println("ERROR: CCS811 no encontrado. Revisa conexion I2C.");
+    Serial.println("ERROR: CCS811 no encontrado");
     while (1) delay(1000);
   }
   while (!ccs.available()) delay(100);
   Serial.println("[2/4] CCS811 OK");
 
-  // WiFi — prueba todas las redes configuradas
-  Serial.println("[3/4] Conectando WiFi...");
-  wifiOk = conectarWifi();
-  if (!wifiOk) Serial.println("      Sin WiFi — modo solo local");
+  // WiFiManager — conecta a red guardada o levanta portal de configuración
+  Serial.println("[3/4] Iniciando WiFiManager...");
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);   // portal disponible 3 min, luego continúa sin WiFi
+  wm.setConnectTimeout(20);
 
-  // NTP — solo si hay WiFi
-  if (wifiOk) {
-    Serial.print("[4/4] Sincronizando hora NTP...");
+  bool conectado = wm.autoConnect("EcoGuardian-Config");
+  if (conectado) {
+    Serial.printf("      WiFi OK — IP: %s\n", WiFi.localIP().toString().c_str());
+  } else {
+    Serial.println("      Sin WiFi — modo solo local");
+  }
+
+  // NTP
+  if (conectado) {
+    Serial.print("[4/4] Sincronizando NTP...");
     configTime(GMT_OFFSET, DST_OFFSET, NTP_SERVER);
     delay(2000);
     time_t now;  time(&now);
-    ntpOk = (now > 1000000000UL);   // epoch real > año 2001
-    Serial.printf(" %s  (%lu)\n", ntpOk ? "OK" : "Fallo", (unsigned long)now);
+    ntpOk = (now > 1000000000UL);
+    Serial.printf(" %s\n", ntpOk ? "OK" : "Fallo");
   } else {
-    Serial.println("[4/4] NTP omitido (sin WiFi)");
+    Serial.println("[4/4] NTP omitido");
   }
 
-  // Calentamiento sensores
   Serial.println("\nCalentando sensores...");
   for (int i = 10; i > 0; i--) {
     Serial.printf("%d ", i);
@@ -291,7 +276,7 @@ void loop() {
   leerCCS811();
   imprimirSerial();
 
-  if (wifiOk && millis() - ultimoEnvio > INTERVALO_ENVIO) {
+  if (WiFi.status() == WL_CONNECTED && millis() - ultimoEnvio > INTERVALO_ENVIO) {
     ultimoEnvio = millis();
     enviarFirebase();
   }
