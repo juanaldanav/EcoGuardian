@@ -2,7 +2,7 @@
 //   useFirebase.js — Hooks para leer datos de Firebase
 // ============================================================
 import { useState, useEffect } from "react";
-import { ref, onValue, query, limitToLast, orderByKey } from "firebase/database";
+import { ref, onValue, query, limitToLast, orderByKey, set, remove } from "firebase/database";
 import { db } from "../constants/firebase";
 
 // Hook: datos en tiempo real de la estación
@@ -42,6 +42,32 @@ export function useHistory() {
   }, []);
 
   return { hist, loading };
+}
+
+// Hook: redes WiFi configuradas
+export function useWifiNetworks() {
+  const [redes, setRedes] = useState([]);
+
+  useEffect(() => {
+    const r = ref(db, "configuracion/redes");
+    const unsub = onValue(r, snap => {
+      const v = snap.val();
+      if (v) setRedes(Object.entries(v).map(([id, d]) => ({ id, ...d })));
+      else   setRedes([]);
+    });
+    return () => unsub();
+  }, []);
+
+  function agregar(ssid, password) {
+    const id = "red_" + Date.now();
+    return set(ref(db, `configuracion/redes/${id}`), { ssid, password });
+  }
+
+  function eliminar(id) {
+    return remove(ref(db, `configuracion/redes/${id}`));
+  }
+
+  return { redes, agregar, eliminar };
 }
 
 // Hook: alertas recientes

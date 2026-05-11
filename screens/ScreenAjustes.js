@@ -5,13 +5,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Switch,
-  TouchableOpacity, Alert,
+  TouchableOpacity, Alert, TextInput, Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-// Requiere: npm install @react-native-async-storage/async-storage
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
-import { useStation } from "../hooks/useFirebase";
+import { useStation, useWifiNetworks } from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
@@ -37,9 +36,72 @@ function Row({ icon, label, sub, right, onPress }) {
 }
 
 // ── Pantalla Ajustes ─────────────────────────────────────────
+// ── Modal agregar red ─────────────────────────────────────────
+function ModalRed({ visible, onClose, onGuardar }) {
+  const [ssid, setSsid]       = useState("");
+  const [pass, setPass]       = useState("");
+  const [verPass, setVerPass] = useState(false);
+
+  function guardar() {
+    if (!ssid.trim()) return Alert.alert("Falta el nombre de la red");
+    onGuardar(ssid.trim(), pass);
+    setSsid(""); setPass("");
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={ss.modalOverlay}>
+        <View style={ss.modalBox}>
+          <Text style={ss.modalTitle}>Agregar red WiFi</Text>
+          <Text style={ss.modalHint}>El dispositivo la usará en el próximo arranque</Text>
+
+          <Text style={ss.inputLabel}>Nombre de la red (SSID)</Text>
+          <TextInput
+            style={ss.input}
+            value={ssid}
+            onChangeText={setSsid}
+            placeholder="Mi Red WiFi"
+            placeholderTextColor={C.text3}
+            autoCapitalize="none"
+          />
+
+          <Text style={ss.inputLabel}>Contraseña</Text>
+          <View style={ss.inputRow}>
+            <TextInput
+              style={[ss.input, { flex: 1 }]}
+              value={pass}
+              onChangeText={setPass}
+              placeholder="Contraseña (vacío si es abierta)"
+              placeholderTextColor={C.text3}
+              secureTextEntry={!verPass}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setVerPass(v => !v)} style={ss.eyeBtn}>
+              <Ionicons name={verPass ? "eye-off-outline" : "eye-outline"} size={18} color={C.text3} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={ss.modalBtns}>
+            <TouchableOpacity onPress={onClose} style={ss.modalBtnSec}>
+              <Text style={ss.modalBtnSecTxt}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={guardar} style={[ss.modalBtnPrim, { backgroundColor: C.green }]}>
+              <Text style={ss.modalBtnPrimTxt}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Pantalla Ajustes ──────────────────────────────────────────
 export default function ScreenAjustes() {
   const { data }                    = useStation();
+  const { redes, agregar, eliminar } = useWifiNetworks();
   const [notifAlertas, setNotifAlertas] = useState(false);
+  const [modalRed, setModalRed]     = useState(false);
   const alertaActivaRef             = useRef(false);
 
   const info = getInfo(data?.pm25 || 0);
@@ -196,7 +258,52 @@ export default function ScreenAjustes() {
         </View>
       )}
 
-      <View style={{ height:24 }} />
+      {/* ── REDES WIFI ──────────────────────────────── */}
+      <Card style={ss.card}>
+        <View style={ss.wifiHeader}>
+          <Text style={ss.sectionTitle}>Redes WiFi del dispositivo</Text>
+          <TouchableOpacity onPress={() => setModalRed(true)} style={ss.addBtn}>
+            <Ionicons name="add" size={16} color={C.green} />
+            <Text style={ss.addBtnTxt}>Agregar</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={ss.rowSub}>
+          El ESP32 las prueba en orden al encender. Los cambios aplican en el siguiente arranque.
+        </Text>
+
+        {redes.length === 0
+          ? <View style={ss.emptyRed}>
+              <Ionicons name="wifi-outline" size={28} color={C.text3} />
+              <Text style={ss.emptyRedTxt}>Sin redes configuradas</Text>
+            </View>
+          : redes.map((red, i) => (
+              <View key={red.id} style={[ss.redRow, i < redes.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }]}>
+                <Ionicons name="wifi" size={16} color={C.green} style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={ss.redSSID}>{red.ssid}</Text>
+                  <Text style={ss.redPass}>{red.password ? "••••••••" : "Red abierta"}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => Alert.alert("Eliminar red", `¿Quitar "${red.ssid}"?`, [
+                    { text: "Cancelar" },
+                    { text: "Eliminar", style: "destructive", onPress: () => eliminar(red.id) },
+                  ])}
+                  style={ss.deleteBtn}
+                >
+                  <Ionicons name="trash-outline" size={16} color={C.text3} />
+                </TouchableOpacity>
+              </View>
+            ))
+        }
+      </Card>
+
+      <View style={{ height: 24 }} />
+
+      <ModalRed
+        visible={modalRed}
+        onClose={() => setModalRed(false)}
+        onGuardar={agregar}
+      />
     </ScrollView>
   );
 }
@@ -229,4 +336,34 @@ const ss = StyleSheet.create({
                      shadowOpacity:.07, shadowRadius:8, elevation:2 },
   activoBannerTitle:{ color:C.green, fontSize:13, fontWeight:"700" },
   activoBannerSub: { color:C.text3, fontSize:11, marginTop:2 },
+  // Redes WiFi
+  wifiHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
+  addBtn:       { flexDirection:"row", alignItems:"center", gap:4,
+                  paddingHorizontal:10, paddingVertical:5, borderRadius:8, backgroundColor:C.green+"12" },
+  addBtnTxt:    { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.green },
+  emptyRed:     { alignItems:"center", paddingVertical:20, gap:8 },
+  emptyRedTxt:  { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3 },
+  redRow:       { flexDirection:"row", alignItems:"center", paddingVertical:12 },
+  redSSID:      { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
+  redPass:      { fontFamily:"JetBrainsMono_400Regular", fontSize:11, color:C.text3, marginTop:2 },
+  deleteBtn:    { padding:6 },
+  // Modal
+  modalOverlay: { flex:1, backgroundColor:"rgba(28,43,30,.45)", justifyContent:"center",
+                  alignItems:"center", padding:24 },
+  modalBox:     { backgroundColor:C.card, borderRadius:20, padding:24, width:"100%",
+                  shadowColor:"#1C2B1E", shadowOffset:{width:0,height:8},
+                  shadowOpacity:.12, shadowRadius:24, elevation:12 },
+  modalTitle:   { fontFamily:"Outfit_700Bold", fontSize:16, color:C.text, marginBottom:4 },
+  modalHint:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3, marginBottom:20 },
+  inputLabel:   { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text2, marginBottom:6 },
+  input:        { backgroundColor:C.bg2, borderRadius:10, paddingHorizontal:14, paddingVertical:10,
+                  fontFamily:"Outfit_400Regular", fontSize:14, color:C.text, marginBottom:14 },
+  inputRow:     { flexDirection:"row", alignItems:"center", gap:8, marginBottom:14 },
+  eyeBtn:       { padding:8, backgroundColor:C.bg2, borderRadius:10 },
+  modalBtns:    { flexDirection:"row", gap:10, marginTop:4 },
+  modalBtnSec:  { flex:1, paddingVertical:12, borderRadius:12, backgroundColor:C.bg2,
+                  alignItems:"center" },
+  modalBtnSecTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:14, color:C.text2 },
+  modalBtnPrim: { flex:1, paddingVertical:12, borderRadius:12, alignItems:"center" },
+  modalBtnPrimTxt:{ fontFamily:"Outfit_700Bold", fontSize:14, color:"#fff" },
 });
