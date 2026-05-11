@@ -41,6 +41,10 @@ export default function ScreenLogin() {
   async function handleSubmit() {
     if (!email.trim() || !pass) return;
     if (modo === "registro" && !nombre.trim()) return;
+    if (modo === "registro" && pass.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
     setLoading(true);
     setError("");
     try {

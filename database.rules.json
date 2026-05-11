@@ -1,0 +1,82 @@
+{
+  "rules": {
+
+    "estaciones": {
+      ".read": true,
+      "$stationId": {
+        ".write": true,
+        "nombre": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "pm25":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
+        "pm10":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
+        "co2":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 10000" },
+        "tvoc":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "lat":   { ".validate": "newData.isNumber()" },
+        "lng":   { ".validate": "newData.isNumber()" }
+      }
+    },
+
+    "historial": {
+      ".read": true,
+      "$stationId": {
+        "$timestamp": {
+          ".write": true,
+          "pm25": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
+          "pm10": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
+          "co2":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 10000" },
+          "tvoc": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "nivel":{ ".validate": "newData.isString()" }
+        }
+      }
+    },
+
+    "alertas": {
+      ".read": "auth != null",
+      ".write": true
+    },
+
+    "configuracion": {
+      "redes": {
+        ".read": true,
+        ".write": "auth != null",
+        "$redId": {
+          ".validate": "newData.hasChildren(['ssid']) && newData.child('ssid').isString()"
+        }
+      }
+    },
+
+    "comunidad": {
+      "reportes": {
+        ".read": true,
+        ".write": "auth != null",
+        "$reporteId": {
+          ".validate": "newData.hasChildren(['descripcion', 'creadoEn', 'uid'])"
+        }
+      },
+      "perfiles": {
+        "$uid": {
+          ".read": true,
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+
+    "usuarios": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "rol": {
+          ".validate": "root.child('usuarios').child(auth.uid).child('rol').val() === 'admin' || newData.val() === 'usuario'"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().contains('@')"
+        },
+        "nombre": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+        }
+      }
+    }
+
+  }
+}
