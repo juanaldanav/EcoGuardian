@@ -5,9 +5,9 @@ import { initializeApp } from "firebase/app";
 import { getDatabase }   from "firebase/database";
 
 const firebaseConfig = {
-  apiKey:      "AIzaSyDWmuLX72KRMMx3BuOzbP7346nrljRLBP0",
-  databaseURL: "https://ecoguardian-68553-default-rtdb.firebaseio.com",
-  projectId:   "ecoguardian-68553",
+  apiKey:      process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId:   process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
 };
 
 const app = initializeApp(firebaseConfig);

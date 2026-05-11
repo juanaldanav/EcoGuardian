@@ -9,7 +9,7 @@ import Card      from "../components/Card";
 import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation } from "../hooks/useFirebase";
-import { getInfo, timeSince } from "../utils/helpers";
+import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -187,9 +187,9 @@ export default function ScreenMapa() {
         <SensorRow
           icon="clock-outline"
           label="Última actualización"
-          value={timeSince(data?.timestamp, data?.receivedAt)}
+          value={timeSince(data?.timestamp) ?? "Sin datos"}
           unit=""
-          color={C.text2}
+          color={isDeviceOnline(data?.timestamp) ? C.text2 : C.text3}
         />
       </Card>
 

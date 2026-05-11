@@ -44,5 +44,9 @@ yarn-error.*
 *service-account*.json
 *serviceAccount*.json
 firebase-adminsdk*.json
+
+# Variables de entorno — NUNCA subir al repo
 .env
 .env.local
+.env.production
+.env.development
