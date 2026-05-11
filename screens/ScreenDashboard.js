@@ -130,7 +130,7 @@ export default function ScreenDashboard() {
   const { hist }          = useHistory();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const online   = isDeviceOnline(data?.receivedAt);
+  const online   = isDeviceOnline(data);
   const lastSync = timeSince(data?.receivedAt);
 
   const pulseAnim  = useRef(new Animated.Value(1)).current;

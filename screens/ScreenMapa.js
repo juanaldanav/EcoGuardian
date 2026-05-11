@@ -191,7 +191,7 @@ export default function ScreenMapa() {
           label="Última actualización"
           value={timeSince(data?.receivedAt) ?? "Sin datos"}
           unit=""
-          color={isDeviceOnline(data?.receivedAt) ? C.text2 : C.text3}
+          color={isDeviceOnline(data) ? C.text2 : C.text3}
         />
       </Card>
 

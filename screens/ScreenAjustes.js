@@ -102,7 +102,7 @@ export default function ScreenAjustes() {
   const { data }                    = useStation();
   const { redes, agregar, eliminar } = useWifiNetworks();
   const { user, perfil, isAdmin, login, logout } = useAuth();
-  const online = isDeviceOnline(data?.receivedAt);
+  const online = isDeviceOnline(data);
   const [notifAlertas, setNotifAlertas] = useState(false);
   const [modalRed, setModalRed]     = useState(false);
   const alertaActivaRef             = useRef(false);
@@ -301,9 +301,9 @@ export default function ScreenAjustes() {
         <Row
           icon="time-outline"
           label="Última actualización"
-          sub={isDeviceOnline(data?.receivedAt) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
+          sub={isDeviceOnline(data) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
           right={
-            <Text style={[ss.gris, !isDeviceOnline(data?.receivedAt) && { color:C.text3 }]}>
+            <Text style={[ss.gris, !isDeviceOnline(data) && { color:C.text3 }]}>
               {timeSince(data?.receivedAt) ? `hace ${timeSince(data?.receivedAt)}` : "Sin datos"}
             </Text>
           }

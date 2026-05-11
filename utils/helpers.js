@@ -12,10 +12,19 @@ export function getInfo(pm25) {
   return                          { label:"Peligroso", color:C.purple, bg:C.purple +"15", emoji:"🟣", score: 500                       };
 }
 
-// true si Firebase empujó datos hace menos de 2 minutos (usa receivedAt del hook, no el timestamp del ESP32)
-export function isDeviceOnline(receivedAt) {
-  if (!receivedAt) return false;
-  return (Date.now() / 1000 - receivedAt) < 120;
+// true si el dispositivo está activo.
+// Prioriza el timestamp NTP del firmware (preciso desde el primer render).
+// Si el firmware aún manda uptime, cae a receivedAt (tiene bug en carga inicial).
+export function isDeviceOnline(data) {
+  if (!data) return false;
+  const { timestamp, receivedAt } = data;
+  if (timestamp && timestamp > 1_000_000_000) {
+    return (Date.now() / 1000 - timestamp) < 120;
+  }
+  if (receivedAt) {
+    return (Date.now() / 1000 - receivedAt) < 120;
+  }
+  return false;
 }
 
 export function timeSince(ts) {
