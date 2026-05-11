@@ -29,7 +29,7 @@
 // ── Firebase ─────────────────────────────────────────────────
 #define FIREBASE_URL   "https://ecoguardian-68553-default-rtdb.firebaseio.com"
 #define STATION_ID     "estacion_01"
-#define STATION_NOMBRE "Estacion Centro Culiacan"
+#define STATION_NOMBRE "EcoGuardian Estacion 01"
 
 // ── Pin para resetear credenciales WiFi (opcional) ───────────
 // Conecta este pin a GND al encender para olvidar la red guardada
@@ -276,8 +276,12 @@ void setup() {
   if (conectado) {
     Serial.print("[4/4] Sincronizando NTP...");
     configTime(GMT_OFFSET, DST_OFFSET, NTP_SERVER);
-    delay(2000);
-    time_t now;  time(&now);
+    time_t now = 0;
+    unsigned long tInicio = millis();
+    while (now < 1000000000UL && millis() - tInicio < 10000) {
+      delay(200);
+      time(&now);
+    }
     ntpOk = (now > 1000000000UL);
     Serial.printf(" %s\n", ntpOk ? "OK" : "Fallo");
   } else {
