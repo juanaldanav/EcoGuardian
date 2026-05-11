@@ -15,20 +15,22 @@ import { useFonts,
 } from "@expo-google-fonts/outfit";
 import { JetBrainsMono_400Regular } from "@expo-google-fonts/jetbrains-mono";
 
-import ScreenDashboard from "./screens/ScreenDashboard";
-import ScreenMapa      from "./screens/ScreenMapa";
-import ScreenAlertas   from "./screens/ScreenAlertas";
-import ScreenHistorial from "./screens/ScreenHistorial";
-import ScreenAjustes   from "./screens/ScreenAjustes";
+import ScreenDashboard  from "./screens/ScreenDashboard";
+import ScreenMapa       from "./screens/ScreenMapa";
+import ScreenAlertas    from "./screens/ScreenAlertas";
+import ScreenHistorial  from "./screens/ScreenHistorial";
+import ScreenAjustes    from "./screens/ScreenAjustes";
+import ScreenComunidad  from "./screens/ScreenComunidad";
 import { C } from "./constants/colors";
 import { F } from "./constants/fonts";
 
 const TABS = [
-  { key:"home",    icon:"home",          iconO:"home-outline",        label:"Inicio"    },
-  { key:"map",     icon:"map",           iconO:"map-outline",         label:"Mapa"      },
-  { key:"alerts",  icon:"warning",       iconO:"warning-outline",     label:"Alertas"   },
-  { key:"history", icon:"stats-chart",   iconO:"stats-chart-outline", label:"Historial" },
-  { key:"settings",icon:"settings-sharp",iconO:"settings-outline",    label:"Ajustes"   },
+  { key:"home",      icon:"home",          iconO:"home-outline",        label:"Inicio"    },
+  { key:"map",       icon:"map",           iconO:"map-outline",         label:"Mapa"      },
+  { key:"community", icon:"people",        iconO:"people-outline",      label:"Comunidad" },
+  { key:"alerts",    icon:"warning",       iconO:"warning-outline",     label:"Alertas"   },
+  { key:"history",   icon:"stats-chart",   iconO:"stats-chart-outline", label:"Historial" },
+  { key:"settings",  icon:"settings-sharp",iconO:"settings-outline",    label:"Ajustes"   },
 ];
 
 // ── Header ────────────────────────────────────────────────────
@@ -73,12 +75,13 @@ function AppLayout() {
 
   const renderScreen = () => {
     switch (tab) {
-      case "home":     return <ScreenDashboard />;
-      case "map":      return <ScreenMapa />;
-      case "alerts":   return <ScreenAlertas />;
-      case "history":  return <ScreenHistorial />;
-      case "settings": return <ScreenAjustes />;
-      default:         return <ScreenDashboard />;
+      case "home":      return <ScreenDashboard />;
+      case "map":       return <ScreenMapa />;
+      case "community": return <ScreenComunidad />;
+      case "alerts":    return <ScreenAlertas />;
+      case "history":   return <ScreenHistorial />;
+      case "settings":  return <ScreenAjustes />;
+      default:          return <ScreenDashboard />;
     }
   };
 

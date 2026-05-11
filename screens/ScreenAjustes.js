@@ -5,12 +5,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Switch,
-  TouchableOpacity, Alert, TextInput, Modal,
+  TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
 import { useStation, useWifiNetworks } from "../hooks/useFirebase";
+import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
@@ -100,10 +101,18 @@ function ModalRed({ visible, onClose, onGuardar }) {
 export default function ScreenAjustes() {
   const { data }                    = useStation();
   const { redes, agregar, eliminar } = useWifiNetworks();
+  const { user, perfil, isAdmin, login, logout } = useAuth();
   const online = isDeviceOnline(data?.timestamp);
   const [notifAlertas, setNotifAlertas] = useState(false);
   const [modalRed, setModalRed]     = useState(false);
   const alertaActivaRef             = useRef(false);
+
+  // Login form state
+  const [loginEmail, setLoginEmail]       = useState("");
+  const [loginPass, setLoginPass]         = useState("");
+  const [loginVerPass, setLoginVerPass]   = useState(false);
+  const [loginLoading, setLoginLoading]   = useState(false);
+  const [loginError, setLoginError]       = useState("");
 
   const info = getInfo(data?.pm25 || 0);
 
@@ -149,6 +158,34 @@ export default function ScreenAjustes() {
     }
   }
 
+  async function handleLogin() {
+    if (!loginEmail.trim() || !loginPass) return;
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      await login(loginEmail.trim(), loginPass);
+      setLoginEmail(""); setLoginPass("");
+    } catch (e) {
+      const msg = e.code === "auth/invalid-credential" || e.code === "auth/wrong-password"
+        ? "Correo o contraseña incorrectos"
+        : e.code === "auth/user-not-found"
+        ? "Usuario no encontrado"
+        : e.code === "auth/invalid-email"
+        ? "Correo inválido"
+        : "Error al iniciar sesión";
+      setLoginError(msg);
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  function handleLogout() {
+    Alert.alert("Cerrar sesión", `¿Salir como ${perfil?.nombre}?`, [
+      { text: "Cancelar" },
+      { text: "Salir", style: "destructive", onPress: () => logout() },
+    ]);
+  }
+
   function probarAlerta() {
     Alert.alert(
       "Prueba de Alerta",
@@ -159,6 +196,73 @@ export default function ScreenAjustes() {
 
   return (
     <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false}>
+
+      {/* ── CUENTA ──────────────────────────────────── */}
+      <Card style={ss.card}>
+        <Text style={ss.sectionTitle}>Cuenta</Text>
+        <View style={ss.div} />
+
+        {user ? (
+          <>
+            <Row
+              icon="person-circle-outline"
+              label={perfil?.nombre || user.email}
+              sub={user.email}
+              right={
+                <View style={[ss.rolBadge, isAdmin && { backgroundColor: C.green + "22" }]}>
+                  <Text style={[ss.rolTxt, { color: isAdmin ? C.green : C.text3 }]}>
+                    {isAdmin ? "Admin" : "Usuario"}
+                  </Text>
+                </View>
+              }
+            />
+            <View style={ss.div} />
+            <TouchableOpacity onPress={handleLogout} style={ss.logoutBtn}>
+              <Ionicons name="log-out-outline" size={16} color={C.red} />
+              <Text style={ss.logoutTxt}>Cerrar sesión</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={ss.inputLabel}>Correo</Text>
+            <TextInput
+              style={ss.input}
+              value={loginEmail}
+              onChangeText={setLoginEmail}
+              placeholder="juan@ejemplo.com"
+              placeholderTextColor={C.text3}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            <Text style={ss.inputLabel}>Contraseña</Text>
+            <View style={ss.inputRow}>
+              <TextInput
+                style={[ss.input, { flex: 1 }]}
+                value={loginPass}
+                onChangeText={setLoginPass}
+                placeholder="••••••••"
+                placeholderTextColor={C.text3}
+                secureTextEntry={!loginVerPass}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setLoginVerPass(v => !v)} style={ss.eyeBtn}>
+                <Ionicons name={loginVerPass ? "eye-off-outline" : "eye-outline"} size={18} color={C.text3} />
+              </TouchableOpacity>
+            </View>
+            {loginError ? <Text style={ss.loginError}>{loginError}</Text> : null}
+            <TouchableOpacity
+              onPress={handleLogin}
+              disabled={loginLoading}
+              style={[ss.loginBtn, { backgroundColor: C.green }]}
+            >
+              {loginLoading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={ss.loginBtnTxt}>Iniciar sesión</Text>
+              }
+            </TouchableOpacity>
+          </>
+        )}
+      </Card>
 
       {/* ── ESTADO DEL SISTEMA ──────────────────────── */}
       <Card style={ss.card}>
@@ -341,6 +445,14 @@ const ss = StyleSheet.create({
                      shadowOpacity:.07, shadowRadius:8, elevation:2 },
   activoBannerTitle:{ color:C.green, fontSize:13, fontWeight:"700" },
   activoBannerSub: { color:C.text3, fontSize:11, marginTop:2 },
+  // Cuenta
+  rolBadge:    { paddingHorizontal:10, paddingVertical:4, borderRadius:10, backgroundColor:C.bg2 },
+  rolTxt:      { fontFamily:"Outfit_600SemiBold", fontSize:11 },
+  logoutBtn:   { flexDirection:"row", alignItems:"center", gap:8, paddingVertical:10 },
+  logoutTxt:   { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.red },
+  loginError:  { fontFamily:"Outfit_400Regular", fontSize:12, color:C.red, marginBottom:4 },
+  loginBtn:    { paddingVertical:12, borderRadius:12, alignItems:"center", marginTop:4 },
+  loginBtnTxt: { fontFamily:"Outfit_700Bold", fontSize:14, color:"#fff" },
   // Redes WiFi
   wifiHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
   addBtn:       { flexDirection:"row", alignItems:"center", gap:4,
