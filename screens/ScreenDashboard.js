@@ -14,7 +14,7 @@ import Card      from "../components/Card";
 import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
-import { getInfo, timeSince } from "../utils/helpers";
+import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
 
@@ -102,7 +102,10 @@ function ResumenModal({ visible, onClose, data, hist }) {
               <View style={ss.modalSection}>
                 <Text style={ss.modalSub}>ÚLTIMA ACTUALIZACIÓN</Text>
                 <Text style={{ color:C.text, fontSize:14, fontWeight:"600" }}>
-                  Hace {timeSince(data?.timestamp, data?.receivedAt)} — {data?.nombre || "Estación Centro"}
+                  {timeSince(data?.timestamp)
+                    ? `Hace ${timeSince(data?.timestamp)}`
+                    : "Sin datos recientes"
+                  } — {data?.nombre || "Estación Centro"}
                 </Text>
               </View>
 
@@ -124,6 +127,9 @@ export default function ScreenDashboard() {
   const { data, loading } = useStation();
   const { hist }          = useHistory();
   const [modalVisible, setModalVisible] = useState(false);
+
+  const online   = isDeviceOnline(data?.timestamp);
+  const lastSync = timeSince(data?.timestamp);
 
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const fadeAnim   = useRef(new Animated.Value(0)).current;
@@ -159,10 +165,15 @@ export default function ScreenDashboard() {
       {/* ── HERO — número grande ─────────────────────── */}
       <View style={ss.heroWrap}>
 
-        {/* Indicador EN VIVO */}
+        {/* Indicador EN VIVO / SIN CONEXIÓN */}
         <View style={ss.liveBadge}>
-          <Animated.View style={[ss.liveDot, { backgroundColor: info.color, opacity: pulseAnim }]} />
-          <Text style={[ss.liveTxt, { color: info.color }]}>EN VIVO</Text>
+          <Animated.View style={[ss.liveDot, {
+            backgroundColor: online ? info.color : C.text3,
+            opacity: online ? pulseAnim : 1,
+          }]} />
+          <Text style={[ss.liveTxt, { color: online ? info.color : C.text3 }]}>
+            {online ? "EN VIVO" : "SIN CONEXIÓN"}
+          </Text>
         </View>
 
         {/* Nivel */}
@@ -191,6 +202,16 @@ export default function ScreenDashboard() {
 
       </View>
 
+      {/* Banner offline */}
+      {!loading && data && !online && (
+        <View style={ss.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={15} color={C.text3} />
+          <Text style={ss.offlineTxt}>
+            Dispositivo apagado — mostrando última lectura guardada
+          </Text>
+        </View>
+      )}
+
       {/* ── 2 TARJETAS ───────────────────────────────── */}
       <Animated.View style={[ss.gridRow, { opacity:fadeAnim }]}>
         <View style={[ss.miniCard, { borderColor:C.green+"33" }]}>
@@ -200,9 +221,11 @@ export default function ScreenDashboard() {
           <Text style={ss.miniSub}>ppm</Text>
         </View>
         <View style={[ss.miniCard, { borderColor:C.text3+"33" }]}>
-          <MaterialCommunityIcons name="sync" size={22} color={C.text2} />
+          <MaterialCommunityIcons name="sync" size={22} color={online ? C.text2 : C.text3} />
           <Text style={ss.miniLabel}>Último sync</Text>
-          <Text style={[ss.miniVal, { color:C.text2 }]}>{timeSince(data?.timestamp, data?.receivedAt)}</Text>
+          <Text style={[ss.miniVal, { color: online ? C.text2 : C.text3 }]}>
+            {lastSync ?? "---"}
+          </Text>
           <Text style={ss.miniSub}>{hist?.length || 0} lecturas</Text>
         </View>
       </Animated.View>
@@ -293,6 +316,10 @@ const ss = StyleSheet.create({
   sensorCard:    { marginHorizontal:16, marginBottom:12 },
   cardHeader:    { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:12 },
   cardTitle:     { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
+  offlineBanner:{ flexDirection:"row", alignItems:"center", gap:8,
+                  marginHorizontal:16, marginBottom:12,
+                  backgroundColor:C.bg2, borderRadius:12, paddingHorizontal:14, paddingVertical:10 },
+  offlineTxt:   { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3, flex:1 },
   alertBanner:  { marginHorizontal:16, marginBottom:12, backgroundColor:C.card,
                   borderRadius:16, padding:16,
                   shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},

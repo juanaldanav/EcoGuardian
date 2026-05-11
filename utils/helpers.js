@@ -12,16 +12,22 @@ export function getInfo(pm25) {
   return                          { label:"Peligroso", color:C.purple, bg:C.purple +"15", emoji:"🟣", score: 500                       };
 }
 
-// Tiempo desde un timestamp en segundos
-// receivedAt: momento en que la app recibió el dato (Unix epoch/1000),
-// usado en lugar de ts cuando el ESP32 envía uptime (millis/1000) en vez de epoch.
-export function timeSince(ts, receivedAt) {
-  const ref = receivedAt || ts;
-  if (!ref) return "-- m";
-  const d = Math.floor((Date.now() / 1000 - ref) / 60);
-  if (d < 1)  return "< 1 min";
-  if (d < 60) return `${d} min`;
-  return `${Math.floor(d / 60)} h`;
+// true si el dispositivo mandó datos hace menos de 2 minutos con NTP real
+export function isDeviceOnline(ts) {
+  if (!ts || ts < 1_000_000_000) return false;
+  return (Date.now() / 1000 - ts) < 120;
+}
+
+// Tiempo desde un timestamp NTP real; null si el timestamp es uptime del ESP32
+export function timeSince(ts) {
+  if (!ts || ts < 1_000_000_000) return null;
+  const secs = Math.floor(Date.now() / 1000 - ts);
+  if (secs < 60)  return "< 1 min";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} h`;
+  return `${Math.floor(h / 24)} d`;
 }
 
 // Formatea timestamp a hora legible

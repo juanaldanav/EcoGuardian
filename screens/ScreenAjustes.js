@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
 import { useStation, useWifiNetworks } from "../hooks/useFirebase";
-import { getInfo, timeSince } from "../utils/helpers";
+import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
 
@@ -100,6 +100,7 @@ function ModalRed({ visible, onClose, onGuardar }) {
 export default function ScreenAjustes() {
   const { data }                    = useStation();
   const { redes, agregar, eliminar } = useWifiNetworks();
+  const online = isDeviceOnline(data?.timestamp);
   const [notifAlertas, setNotifAlertas] = useState(false);
   const [modalRed, setModalRed]     = useState(false);
   const alertaActivaRef             = useRef(false);
@@ -180,7 +181,7 @@ export default function ScreenAjustes() {
         <Row
           icon="hardware-chip"
           label="Estación"
-          sub="estacion_01 — Culiacán, Sinaloa"
+          sub={online ? "estacion_01 — En línea" : "estacion_01 — Sin conexión"}
           right={
             <View style={[ss.nivelBadge, { backgroundColor:info.color+"22", borderColor:info.color+"44" }]}>
               <Text style={[ss.nivelTxt, { color:info.color }]}>{info.emoji} {info.label}</Text>
@@ -192,8 +193,12 @@ export default function ScreenAjustes() {
         <Row
           icon="time-outline"
           label="Última actualización"
-          sub="Timestamp del sensor"
-          right={<Text style={ss.gris}>{timeSince(data?.timestamp, data?.receivedAt)}</Text>}
+          sub={isDeviceOnline(data?.timestamp) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
+          right={
+            <Text style={[ss.gris, !isDeviceOnline(data?.timestamp) && { color:C.text3 }]}>
+              {timeSince(data?.timestamp) ? `hace ${timeSince(data?.timestamp)}` : "Sin datos"}
+            </Text>
+          }
         />
         <View style={ss.div} />
 
