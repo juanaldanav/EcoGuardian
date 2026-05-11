@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase service account (nunca subir al repo)
+*service-account*.json
+*serviceAccount*.json
+firebase-adminsdk*.json
+.env
+.env.local
