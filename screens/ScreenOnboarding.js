@@ -2,16 +2,19 @@
 //   ScreenOnboarding.js — Wizard de primer uso
 //   Flujo: bienvenida → dispositivo → QR → nombre → WiFi → listo
 // ============================================================
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Image, ScrollView, Platform, Alert,
+  Animated, Dimensions,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ref, update, get } from "firebase/database";
 import { db } from "../constants/firebase";
 import { C } from "../constants/colors";
 import ScreenTienda from "./ScreenTienda";
+
+const W = Dimensions.get("window").width;
 
 // QR scan solo en nativo; en web se pide código manual
 let CameraView = null;
@@ -24,7 +27,7 @@ if (Platform.OS !== "web") {
 
 // ── Selector de estaciones (web) ─────────────────────────────
 function StationPicker({ onSelect }) {
-  const [estaciones, setEstaciones] = React.useState(null); // null = cargando
+  const [estaciones, setEstaciones] = React.useState(null);
 
   React.useEffect(() => {
     get(ref(db, "estaciones")).then(snap => {
@@ -144,19 +147,58 @@ function QRScanner({ onScanned }) {
 
 // ── Pantalla principal ────────────────────────────────────────
 export default function ScreenOnboarding({ uid, nombre }) {
-  const [paso,          setPaso]          = useState(0);
-  const [mostrarTienda, setMostrarTienda] = useState(false);
+  const [paso,           setPaso]          = useState(0);
+  const [mostrarTienda,  setMostrarTienda] = useState(false);
   const [sinDispositivo, setSinDispositivo] = useState(false);
-  const [stationId,     setStationId]     = useState("");
-  const [codigoManual,  setCodigoManual]  = useState(false);
-  const [codigoInput,   setCodigoInput]   = useState("");
-  const [stationName,   setStationName]   = useState("");
-  const [ssid,          setSsid]          = useState("");
-  const [wifiPass,      setWifiPass]      = useState("");
-  const [verPass,       setVerPass]       = useState(false);
-  const [saving,        setSaving]        = useState(false);
+  const [stationId,      setStationId]     = useState("");
+  const [codigoManual,   setCodigoManual]  = useState(false);
+  const [codigoInput,    setCodigoInput]   = useState("");
+  const [stationName,    setStationName]   = useState("");
+  const [ssid,           setSsid]          = useState("");
+  const [wifiPass,       setWifiPass]      = useState("");
+  const [verPass,        setVerPass]       = useState(false);
+  const [saving,         setSaving]        = useState(false);
+
+  // Transición entre pasos
+  const slideX        = useRef(new Animated.Value(0)).current;
+  const slideOpacity  = useRef(new Animated.Value(1)).current;
+
+  // Animación dots flotantes (paso 0)
+  const dot1Y = useRef(new Animated.Value(0)).current;
+  const dot2Y = useRef(new Animated.Value(0)).current;
+  const dot3Y = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const makeFloat = (anim, delay) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: -8, duration: 1600, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0,  duration: 1600, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    makeFloat(dot1Y, 0);
+    makeFloat(dot2Y, 600);
+    makeFloat(dot3Y, 1200);
+  }, []);
 
   const nombreDisplay = nombre?.split(" ")[0] || "bienvenido";
+
+  // Navega al siguiente paso con animación slide+fade
+  function navigateTo(nextPaso, dir = 1) {
+    Animated.parallel([
+      Animated.timing(slideX,       { toValue: -dir * 22, duration: 140, useNativeDriver: true }),
+      Animated.timing(slideOpacity, { toValue: 0,          duration: 120, useNativeDriver: true }),
+    ]).start(() => {
+      slideX.setValue(dir * 22);
+      setPaso(nextPaso);
+      Animated.parallel([
+        Animated.spring(slideX,      { toValue: 0, tension: 100, friction: 12, useNativeDriver: true }),
+        Animated.timing(slideOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    });
+  }
 
   if (mostrarTienda) {
     return <ScreenTienda onBack={() => setMostrarTienda(false)} />;
@@ -181,39 +223,66 @@ export default function ScreenOnboarding({ uid, nombre }) {
         }
       }
       await update(ref(db), updates);
-      // App.js detecta onboardingCompleto:true automáticamente
     } catch (e) {
       Alert.alert("Error", "No se pudo guardar la configuración. Revisa tu conexión.");
       setSaving(false);
     }
   }
 
-  // ── PASO 0: Bienvenida ─────────────────────────────────────
-  if (paso === 0) {
+  // ── Renderizadores por paso ────────────────────────────────
+
+  function renderWelcome() {
     return (
-      <View style={ss.root}>
-        <View style={ss.centrado}>
-          <View style={ss.logoBox}>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView
+          contentContainerStyle={ss.welcomeScroll}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero art */}
+          <View style={ss.heroArt}>
+            <View style={[ss.arc, ss.arc1]} />
+            <View style={[ss.arc, ss.arc2]} />
+            <View style={[ss.arc, ss.arc3]} />
+            <Animated.View style={[ss.floatDot, ss.dot1, { transform: [{ translateY: dot1Y }] }]} />
+            <Animated.View style={[ss.floatDot, ss.dot2, { transform: [{ translateY: dot2Y }] }]} />
+            <Animated.View style={[ss.floatDot, ss.dot3, { transform: [{ translateY: dot3Y }] }]} />
             <Image
               source={require("../assets/ecoguardian-mark.png")}
-              style={{ width: 52, height: 52, resizeMode: "contain" }}
+              style={ss.heroLogo}
             />
           </View>
-          <Text style={ss.bienvenidaTitulo}>Hola, {nombreDisplay}</Text>
-          <Text style={ss.bienvenidaSub}>
-            Vamos a configurar tu estación de monitoreo. Solo toma un par de minutos.
+
+          <Text style={ss.greeting}>HOLA, {nombreDisplay.toUpperCase()}</Text>
+
+          <Text style={ss.welcomeH2}>
+            Vamos a configurar tu{" "}
+            <Text style={ss.welcomeH2Bold}>estación de monitoreo</Text>
           </Text>
-          <TouchableOpacity style={ss.btnPrim} onPress={() => setPaso(1)} activeOpacity={0.8}>
-            <Text style={ss.btnPrimTxt}>Comenzar</Text>
-            <Ionicons name="arrow-forward" size={16} color="#fff" />
+
+          <Text style={ss.welcomeLead}>
+            Conectaremos tu sensor EcoGuardian a la red de tu casa para empezar a recibir lecturas de calidad del aire en tiempo real.
+          </Text>
+
+          <View style={ss.timePill}>
+            <Ionicons name="time-outline" size={12} color={C.green} />
+            <Text style={ss.timePillTxt}>3 MIN · 4 PASOS</Text>
+          </View>
+        </ScrollView>
+
+        <View style={ss.welcomeFoot}>
+          <TouchableOpacity
+            style={ss.btnHero}
+            onPress={() => navigateTo(1)}
+            activeOpacity={0.85}
+          >
+            <Text style={ss.btnHeroTxt}>Comenzar configuración</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // ── PASO 1: ¿Tienes dispositivo? ───────────────────────────
-  if (paso === 1) {
+  function renderHasDevice() {
     return (
       <View style={ss.root}>
         <Progreso paso={0} total={4} />
@@ -224,10 +293,9 @@ export default function ScreenOnboarding({ uid, nombre }) {
             Tu kit incluye el sensor de calidad del aire con GPS y conectividad WiFi.
           </Text>
 
-          {/* Opción 1: Ya tengo */}
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.green }]}
-            onPress={() => setPaso(2)}
+            onPress={() => navigateTo(2)}
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons name="check-circle-outline" size={24} color={C.green} />
@@ -238,7 +306,6 @@ export default function ScreenOnboarding({ uid, nombre }) {
             <Ionicons name="arrow-forward" size={18} color={C.green} />
           </TouchableOpacity>
 
-          {/* Opción 2: Comprar */}
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.border, marginTop: 12 }]}
             onPress={() => setMostrarTienda(true)}
@@ -252,10 +319,9 @@ export default function ScreenOnboarding({ uid, nombre }) {
             <Ionicons name="arrow-forward" size={18} color={C.greenD} />
           </TouchableOpacity>
 
-          {/* Opción 3: Solo explorar */}
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.border, marginTop: 12 }]}
-            onPress={() => { setSinDispositivo(true); setPaso(5); }}
+            onPress={() => { setSinDispositivo(true); navigateTo(5); }}
             activeOpacity={0.8}
           >
             <MaterialCommunityIcons name="map-search-outline" size={24} color={C.text3} />
@@ -270,20 +336,19 @@ export default function ScreenOnboarding({ uid, nombre }) {
     );
   }
 
-  // ── PASO 2: Escanear QR ────────────────────────────────────
-  if (paso === 2) {
+  function renderScanQR() {
     function confirmarCodigo(id) {
       const limpio = id.trim();
       if (!limpio) return;
       setStationId(limpio);
-      setPaso(3);
+      navigateTo(3);
     }
 
     return (
       <View style={ss.root}>
         <Progreso paso={1} total={4} />
         <View style={ss.headerRow}>
-          <TouchableOpacity onPress={() => setPaso(1)} style={ss.backBtn}>
+          <TouchableOpacity onPress={() => navigateTo(1, -1)} style={ss.backBtn}>
             <Ionicons name="arrow-back" size={20} color={C.text2} />
           </TouchableOpacity>
           <Text style={ss.headerTitulo}>Escanear dispositivo</Text>
@@ -333,13 +398,12 @@ export default function ScreenOnboarding({ uid, nombre }) {
     );
   }
 
-  // ── PASO 3: Nombre de estación ─────────────────────────────
-  if (paso === 3) {
+  function renderStationName() {
     return (
       <View style={ss.root}>
         <Progreso paso={2} total={4} />
         <View style={ss.headerRow}>
-          <TouchableOpacity onPress={() => setPaso(2)} style={ss.backBtn}>
+          <TouchableOpacity onPress={() => navigateTo(2, -1)} style={ss.backBtn}>
             <Ionicons name="arrow-back" size={20} color={C.text2} />
           </TouchableOpacity>
           <Text style={ss.headerTitulo}>Nombre de tu estación</Text>
@@ -362,7 +426,7 @@ export default function ScreenOnboarding({ uid, nombre }) {
           <Text style={ss.charCount}>{stationName.length}/40</Text>
           <TouchableOpacity
             style={[ss.btnPrim, { opacity: stationName.trim() ? 1 : 0.5 }]}
-            onPress={() => setPaso(4)}
+            onPress={() => navigateTo(4)}
             disabled={!stationName.trim()}
             activeOpacity={0.8}
           >
@@ -374,13 +438,12 @@ export default function ScreenOnboarding({ uid, nombre }) {
     );
   }
 
-  // ── PASO 4: WiFi ───────────────────────────────────────────
-  if (paso === 4) {
+  function renderWifi() {
     return (
       <View style={ss.root}>
         <Progreso paso={3} total={4} />
         <View style={ss.headerRow}>
-          <TouchableOpacity onPress={() => setPaso(3)} style={ss.backBtn}>
+          <TouchableOpacity onPress={() => navigateTo(3, -1)} style={ss.backBtn}>
             <Ionicons name="arrow-back" size={20} color={C.text2} />
           </TouchableOpacity>
           <Text style={ss.headerTitulo}>Red WiFi del sensor</Text>
@@ -446,8 +509,8 @@ export default function ScreenOnboarding({ uid, nombre }) {
     );
   }
 
-  // ── PASO 5: Confirmación sin dispositivo ───────────────────
-  if (paso === 5 && sinDispositivo) {
+  function renderSuccess() {
+    if (!sinDispositivo) return null;
     return (
       <View style={ss.root}>
         <View style={ss.centrado}>
@@ -480,7 +543,30 @@ export default function ScreenOnboarding({ uid, nombre }) {
     );
   }
 
-  return null;
+  function renderPaso() {
+    switch (paso) {
+      case 0: return renderWelcome();
+      case 1: return renderHasDevice();
+      case 2: return renderScanQR();
+      case 3: return renderStationName();
+      case 4: return renderWifi();
+      case 5: return renderSuccess();
+      default: return null;
+    }
+  }
+
+  return (
+    <View style={ss.root}>
+      <Animated.View
+        style={[
+          { flex: 1 },
+          { opacity: slideOpacity, transform: [{ translateX: slideX }] },
+        ]}
+      >
+        {renderPaso()}
+      </Animated.View>
+    </View>
+  );
 }
 
 const ss = StyleSheet.create({
@@ -556,4 +642,119 @@ const ss = StyleSheet.create({
   stationCardNombre:{ fontFamily: "Outfit_600SemiBold", fontSize: 15, color: C.text },
   stationCardId:    { fontFamily: "JetBrainsMono_400Regular", fontSize: 10,
                       color: C.text3, marginTop: 2 },
+
+  // ── Paso 0: Welcome ───────────────────────────────────────
+  welcomeScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  heroArt: {
+    aspectRatio: 1,
+    backgroundColor: C.greenD,
+    borderRadius: 24,
+    marginBottom: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: C.greenD,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.38,
+    shadowRadius: 22,
+    elevation: 12,
+  },
+  arc: {
+    position: "absolute",
+    borderRadius: 9999,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  arc1: { top: -60, right: -60, width: 180, height: 180, borderWidth: 14 },
+  arc2: { top: -100, right: -100, width: 260, height: 260, borderWidth: 12 },
+  arc3: { bottom: -80, left: -80, width: 220, height: 220, borderWidth: 10 },
+  floatDot: {
+    position: "absolute",
+    width: 8, height: 8,
+    backgroundColor: C.accent,
+    borderRadius: 4,
+  },
+  dot1: { top: "22%", left: "18%" },
+  dot2: { top: "60%", left: "74%" },
+  dot3: { top: "80%", left: "30%" },
+  heroLogo: {
+    width: 88, height: 88,
+    resizeMode: "contain",
+    zIndex: 2,
+  },
+  greeting: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 11,
+    color: C.green,
+    letterSpacing: 3,
+    marginBottom: 8,
+  },
+  welcomeH2: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 22,
+    color: C.text,
+    lineHeight: 30,
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  welcomeH2Bold: {
+    fontFamily: "Outfit_700Bold",
+    color: C.green,
+  },
+  welcomeLead: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 13,
+    color: C.text2,
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  timePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: C.card,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  timePillTxt: {
+    fontFamily: "JetBrainsMono_400Regular",
+    fontSize: 10,
+    letterSpacing: 2,
+    color: C.text2,
+  },
+  welcomeFoot: {
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 12,
+    backgroundColor: C.bg,
+  },
+  btnHero: {
+    backgroundColor: C.green,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#14241a",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 1,
+        shadowRadius: 1,
+      },
+      android: { elevation: 6 },
+      web: { boxShadow: "0 4px 0 #14241a" },
+    }),
+  },
+  btnHeroTxt: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 15,
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
 });
