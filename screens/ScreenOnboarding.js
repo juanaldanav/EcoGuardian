@@ -9,7 +9,7 @@ import {
   Animated, Dimensions,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { ref, update, get } from "firebase/database";
+import { ref, update, get, onValue } from "firebase/database";
 import { db } from "../constants/firebase";
 import { C } from "../constants/colors";
 import ScreenTienda from "./ScreenTienda";
@@ -30,14 +30,15 @@ function StationPicker({ onSelect }) {
   const [estaciones, setEstaciones] = React.useState(null);
 
   React.useEffect(() => {
-    get(ref(db, "estaciones")).then(snap => {
+    const unsub = onValue(ref(db, "estaciones"), snap => {
       if (!snap.exists()) { setEstaciones([]); return; }
       const lista = Object.entries(snap.val()).map(([id, val]) => ({
         id,
         nombre: val.nombre || id,
       }));
       setEstaciones(lista);
-    }).catch(() => setEstaciones([]));
+    }, () => setEstaciones([]));
+    return () => unsub();
   }, []);
 
   if (estaciones === null) {
@@ -52,9 +53,15 @@ function StationPicker({ onSelect }) {
   if (estaciones.length === 0) {
     return (
       <ScrollView contentContainerStyle={ss.scrollContent}>
-        <MaterialCommunityIcons name="devices" size={48} color={C.text3} style={ss.stepIcon} />
-        <Text style={ss.stepTitulo}>Sin dispositivos disponibles</Text>
-        <Text style={ss.stepSub}>No encontramos estaciones registradas. Verifica que el dispositivo esté encendido y conectado.</Text>
+        <MaterialCommunityIcons name="access-point-off" size={48} color={C.text3} style={ss.stepIcon} />
+        <Text style={ss.stepTitulo}>Esperando dispositivo...</Text>
+        <Text style={ss.stepSub}>
+          Enciende tu EcoG Station y conéctalo a WiFi. Aparecerá aquí automáticamente en cuanto mande su primera lectura.
+        </Text>
+        <View style={ss.deviceHint}>
+          <ActivityIndicator size="small" color={C.green} style={{ marginRight: 4 }} />
+          <Text style={ss.deviceHintTxt}>Escuchando en tiempo real — no necesitas recargar.</Text>
+        </View>
       </ScrollView>
     );
   }
@@ -68,12 +75,6 @@ function StationPicker({ onSelect }) {
           ? "Encontramos 1 dispositivo disponible. Tócalo para vincularlo a tu cuenta."
           : `Encontramos ${estaciones.length} dispositivos. Toca el tuyo para vincularlo.`}
       </Text>
-      <View style={ss.deviceHint}>
-        <Ionicons name="information-circle-outline" size={14} color={C.text3} />
-        <Text style={ss.deviceHintTxt}>
-          Asegúrate de que el dispositivo esté encendido y conectado a WiFi antes de continuar. Si la lista está vacía, espera ~30 seg y regresa.
-        </Text>
-      </View>
       {estaciones.map(e => (
         <TouchableOpacity
           key={e.id}
