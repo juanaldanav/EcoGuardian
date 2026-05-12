@@ -314,16 +314,17 @@ export default function ScreenOnboarding({ uid, nombre }) {
       Linking.openURL(ok ? "App-Prefs:WIFI" : "app-settings:");
     } else if (Platform.OS === "android") {
       Linking.sendIntent("android.settings.WIFI_SETTINGS").catch(() =>
-        Alert.alert(
-          "Ajustes WiFi",
-          "Abre manualmente la configuración WiFi de tu dispositivo y conéctate a 'EcoGuardian-Config'."
-        )
+        Alert.alert("Ajustes WiFi", "Conéctate a la red 'EcoGuardian-Config' desde los ajustes de tu dispositivo.")
       );
     } else {
-      Alert.alert(
-        "Ajustes WiFi del dispositivo",
-        "1. Abre la configuración WiFi de tu dispositivo.\n2. Conéctate a la red:\n\n   EcoGuardian-Config\n\n3. Se abrirá un portal — elige tu red WiFi e ingresa la contraseña.\n4. Vuelve a la app. La estación aparecerá automáticamente.",
-        [{ text: "Entendido" }]
+      // En web Alert.alert no siempre funciona — usar window.alert directo
+      // eslint-disable-next-line no-alert
+      window.alert(
+        "Pasos para conectar:\n\n" +
+        "1. Abre los ajustes WiFi de tu dispositivo\n" +
+        "2. Conéctate a la red:  EcoGuardian-Config\n" +
+        "3. Se abre un portal — elige tu red WiFi e ingresa la contraseña\n" +
+        "4. Vuelve a la app — la estación aparece sola"
       );
     }
   }
