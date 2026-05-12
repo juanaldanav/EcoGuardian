@@ -512,30 +512,66 @@ export default function ScreenOnboarding({ uid, nombre }) {
   function renderSuccess() {
     if (!sinDispositivo) return null;
     return (
-      <View style={ss.root}>
-        <View style={ss.centrado}>
-          <View style={[ss.logoBox, { backgroundColor: C.bg2 }]}>
-            <MaterialCommunityIcons name="earth" size={44} color={C.green} />
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView contentContainerStyle={ss.welcomeScroll} showsVerticalScrollIndicator={false}>
+
+          {/* Hero — mismo lenguaje que paso 0, altura fija en lugar de aspecto 1:1 */}
+          <View style={ss.successHero}>
+            <View style={[ss.arc, ss.arc1]} />
+            <View style={[ss.arc, ss.arc3]} />
+            <View style={ss.successIconCircle}>
+              <Ionicons name="checkmark" size={44} color="#fff" />
+            </View>
           </View>
-          <Text style={ss.bienvenidaTitulo}>Todo listo</Text>
-          <Text style={[ss.bienvenidaSub, { marginBottom: 12 }]}>
-            Puedes explorar datos de calidad del aire de la red pública y reportar incidentes en tu comunidad.
+
+          <Text style={ss.greeting}>MODO EXPLORADOR</Text>
+
+          <Text style={ss.welcomeH2}>
+            Todo listo,{" "}
+            <Text style={ss.welcomeH2Bold}>{nombreDisplay}</Text>
           </Text>
-          <Text style={[ss.bienvenidaSub, { fontSize: 12, marginBottom: 40 }]}>
-            Cuando tengas tu dispositivo, vincúlalo desde la sección Ajustes.
+
+          <Text style={ss.welcomeLead}>
+            Tienes acceso a los datos de la red pública de monitoreo. Puedes ver el mapa y reportar incidentes.
           </Text>
+
+          {/* Items */}
+          {[
+            { icon: "map",        label: "Mapa en tiempo real",          sub: "Estaciones activas de la red pública" },
+            { icon: "stats-chart", label: "Historial de calidad del aire", sub: "Últimas 30 lecturas disponibles"       },
+            { icon: "people",     label: "Comunidad",                    sub: "Reporta incidentes en tu ciudad"        },
+          ].map((item, i) => (
+            <View key={i} style={ss.successItem}>
+              <View style={ss.successItemIco}>
+                <Ionicons name={item.icon} size={16} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ss.successItemLbl}>{item.label}</Text>
+                <Text style={ss.successItemSub}>{item.sub}</Text>
+              </View>
+              <Ionicons name="checkmark-circle" size={18} color={C.green} />
+            </View>
+          ))}
+
+          <View style={ss.successNote}>
+            <Ionicons name="information-circle-outline" size={14} color={C.text3} />
+            <Text style={ss.successNoteTxt}>
+              Cuando tengas tu dispositivo, vincúlalo desde Ajustes.
+            </Text>
+          </View>
+
+        </ScrollView>
+
+        <View style={ss.welcomeFoot}>
           <TouchableOpacity
-            style={[ss.btnPrim, { opacity: saving ? 0.6 : 1 }]}
+            style={[ss.btnHero, { opacity: saving ? 0.6 : 1 }]}
             onPress={() => finalizar(false)}
             disabled={saving}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {saving
               ? <ActivityIndicator size="small" color="#fff" />
-              : <>
-                  <Text style={ss.btnPrimTxt}>Entrar a EcoGuardian</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#fff" />
-                </>
+              : <Text style={ss.btnHeroTxt}>Entrar a EcoGuardian</Text>
             }
           </TouchableOpacity>
         </View>
@@ -756,5 +792,73 @@ const ss = StyleSheet.create({
     fontSize: 15,
     color: "#fff",
     letterSpacing: 0.3,
+  },
+
+  // ── Paso 5: Explorador (Todo listo) ───────────────────────
+  successHero: {
+    height: 190,
+    backgroundColor: C.greenD,
+    borderRadius: 24,
+    marginBottom: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: C.greenD,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.38,
+    shadowRadius: 22,
+    elevation: 12,
+  },
+  successIconCircle: {
+    width: 92, height: 92,
+    borderRadius: 46,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  successItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.card,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    gap: 12,
+  },
+  successItemIco: {
+    width: 34, height: 34,
+    borderRadius: 10,
+    backgroundColor: C.green + "16",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  successItemLbl: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 13,
+    color: C.text,
+    marginBottom: 2,
+  },
+  successItemSub: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 11,
+    color: C.text3,
+    lineHeight: 15,
+  },
+  successNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  successNoteTxt: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 11,
+    color: C.text3,
+    flex: 1,
+    lineHeight: 16,
   },
 });

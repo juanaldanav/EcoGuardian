@@ -5,19 +5,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Switch,
-  TouchableOpacity, Alert, TextInput, Modal, ActivityIndicator, Platform,
+  TouchableOpacity, Alert, TextInput, Modal,
+  ActivityIndicator, Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
 import { ref as dbRef, update, remove } from "firebase/database";
 import { db, auth } from "../constants/firebase";
 import { deleteUser } from "firebase/auth";
-import { useStation, useWifiNetworks } from "../hooks/useFirebase";
+import { useStations, useWifiNetworks } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
+import ScreenTienda from "./ScreenTienda";
 
 // ── Fila reutilizable ────────────────────────────────────────
 function Row({ icon, label, sub, right, onPress }) {
@@ -39,7 +41,6 @@ function Row({ icon, label, sub, right, onPress }) {
     : content;
 }
 
-// ── Pantalla Ajustes ─────────────────────────────────────────
 // ── Modal agregar red ─────────────────────────────────────────
 function ModalRed({ visible, onClose, onGuardar }) {
   const [ssid, setSsid]       = useState("");
@@ -102,22 +103,36 @@ function ModalRed({ visible, onClose, onGuardar }) {
 
 // ── Pantalla Ajustes ──────────────────────────────────────────
 export default function ScreenAjustes() {
-  const { data }                    = useStation();
+  const { stations }                = useStations();
   const { redes, agregar, eliminar } = useWifiNetworks();
   const { user, perfil, isAdmin, login, logout } = useAuth();
-  const online = isDeviceOnline(data);
+
+  // Estaciones vinculadas al usuario
+  const estacionIds      = perfil?.estaciones ? Object.keys(perfil.estaciones) : [];
+  const tieneDispositivo = estacionIds.length > 0;
+  const primeraId        = estacionIds[0] || null;
+  const stationData      = primeraId ? (stations[primeraId] || null) : null;
+  const online           = isDeviceOnline(stationData);
+  const info             = getInfo(stationData?.pm25 || 0);
+
+  // Tick cada 30s para recalcular isDeviceOnline sin esperar evento Firebase
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceUpdate(n => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   const [notifAlertas, setNotifAlertas] = useState(false);
-  const [modalRed, setModalRed]     = useState(false);
-  const alertaActivaRef             = useRef(false);
+  const [modalRed,     setModalRed]     = useState(false);
+  const [mostrarTienda, setMostrarTienda] = useState(false);
+  const alertaActivaRef = useRef(false);
 
   // Login form state
-  const [loginEmail, setLoginEmail]       = useState("");
-  const [loginPass, setLoginPass]         = useState("");
-  const [loginVerPass, setLoginVerPass]   = useState(false);
-  const [loginLoading, setLoginLoading]   = useState(false);
-  const [loginError, setLoginError]       = useState("");
-
-  const info = getInfo(data?.pm25 || 0);
+  const [loginEmail,    setLoginEmail]    = useState("");
+  const [loginPass,     setLoginPass]     = useState("");
+  const [loginVerPass,  setLoginVerPass]  = useState(false);
+  const [loginLoading,  setLoginLoading]  = useState(false);
+  const [loginError,    setLoginError]    = useState("");
 
   // Carga persistencia de notifAlertas al montar
   useEffect(() => {
@@ -126,26 +141,20 @@ export default function ScreenAjustes() {
     });
   }, []);
 
-  // Vigila cambios en la alarma de Firebase
+  // Vigila cambios en la alarma de la estación del usuario
   useEffect(() => {
-    if (!notifAlertas) return;
-
-    // Si la alarma se activa y no habíamos notificado aún
-    if (data?.alarma && !alertaActivaRef.current) {
+    if (!notifAlertas || !stationData) return;
+    if (stationData?.alarma && !alertaActivaRef.current) {
       alertaActivaRef.current = true;
-      const ni = getInfo(data?.pm25 || 0);
+      const ni = getInfo(stationData?.pm25 || 0);
       Alert.alert(
         "Alerta de Calidad del Aire",
-        `Nivel ${ni.label}\nPM2.5: ${(data?.pm25||0).toFixed(1)} µg/m³\n\nEvita actividad al aire libre.`,
+        `Nivel ${ni.label}\nPM2.5: ${(stationData?.pm25||0).toFixed(1)} µg/m³\n\nEvita actividad al aire libre.`,
         [{ text: "Entendido", style: "default" }]
       );
     }
-
-    // Resetea cuando el aire vuelve a ser bueno
-    if (!data?.alarma) {
-      alertaActivaRef.current = false;
-    }
-  }, [data?.alarma, notifAlertas]);
+    if (!stationData?.alarma) alertaActivaRef.current = false;
+  }, [stationData?.alarma, notifAlertas]);
 
   function toggleNotifAlertas(valor) {
     AsyncStorage.setItem('notifAlertas', String(valor));
@@ -171,10 +180,8 @@ export default function ScreenAjustes() {
     } catch (e) {
       const msg = e.code === "auth/invalid-credential" || e.code === "auth/wrong-password"
         ? "Correo o contraseña incorrectos"
-        : e.code === "auth/user-not-found"
-        ? "Usuario no encontrado"
-        : e.code === "auth/invalid-email"
-        ? "Correo inválido"
+        : e.code === "auth/user-not-found" ? "Usuario no encontrado"
+        : e.code === "auth/invalid-email"  ? "Correo inválido"
         : "Error al iniciar sesión";
       setLoginError(msg);
     } finally {
@@ -204,11 +211,32 @@ export default function ScreenAjustes() {
     );
   }
 
+  // Abre el wizard de configuración de nuevo para vincular un dispositivo
+  async function vincularDispositivo() {
+    Alert.alert(
+      "Vincular dispositivo",
+      "Se abrirá el asistente de configuración para vincular tu EcoG Station. ¿Continuar?",
+      [
+        { text: "Cancelar" },
+        {
+          text: "Continuar",
+          onPress: async () => {
+            try {
+              await update(dbRef(db, `usuarios/${user.uid}`), {
+                onboardingCompleto: false,
+              });
+              // App.js detecta el cambio en tiempo real y muestra el onboarding
+            } catch (e) {
+              Alert.alert("Error", "No se pudo iniciar el asistente. Intenta de nuevo.");
+            }
+          },
+        },
+      ]
+    );
+  }
+
   function handleLogout() {
-    if (Platform.OS === "web") {
-      logout();
-      return;
-    }
+    if (Platform.OS === "web") { logout(); return; }
     Alert.alert("Cerrar sesión", `¿Salir como ${perfil?.nombre}?`, [
       { text: "Cancelar" },
       { text: "Salir", style: "destructive", onPress: () => logout() },
@@ -216,9 +244,10 @@ export default function ScreenAjustes() {
   }
 
   function probarAlerta() {
+    const nombreEstacion = stationData?.nombre || primeraId || "—";
     Alert.alert(
       "Prueba de Alerta",
-      `Las alertas están funcionando correctamente.\n\nEstación: ${data?.nombre || "estacion_01"}\nPM2.5 actual: ${(data?.pm25||0).toFixed(1)} µg/m³\nNivel: ${info.label}`,
+      `Las alertas están funcionando correctamente.\n\nEstación: ${nombreEstacion}\nPM2.5 actual: ${(stationData?.pm25||0).toFixed(1)} µg/m³\nNivel: ${info.label}`,
       [{ text: "Cerrar", style: "default" }]
     );
   }
@@ -302,6 +331,70 @@ export default function ScreenAjustes() {
         )}
       </Card>
 
+      {/* ── MI DISPOSITIVO ──────────────────────────── */}
+      <Card style={ss.card}>
+        <Text style={ss.sectionTitle}>Mi dispositivo</Text>
+        <View style={ss.div} />
+
+        {tieneDispositivo ? (
+          <>
+            <Row
+              icon="hardware-chip"
+              label={stationData?.nombre || primeraId}
+              sub={online ? "En línea · datos en tiempo real" : "Sin conexión reciente"}
+              right={
+                <View style={[ss.estadoBadge, !online && { backgroundColor: C.border + "80" }]}>
+                  <View style={[ss.estadoDot, !online && { backgroundColor: C.text3 }]} />
+                  <Text style={[ss.estadoTxt, !online && { color: C.text3 }]}>
+                    {online ? "En línea" : "Offline"}
+                  </Text>
+                </View>
+              }
+            />
+            {stationData?.pm25 != null && (
+              <>
+                <View style={ss.div} />
+                <Row
+                  icon="partly-sunny-outline"
+                  label="Calidad del aire"
+                  sub={`PM2.5: ${stationData.pm25.toFixed(1)} µg/m³`}
+                  right={
+                    <View style={[ss.nivelBadge, { backgroundColor: info.color+"22", borderColor: info.color+"44" }]}>
+                      <Text style={[ss.nivelTxt, { color: info.color }]}>{info.label}</Text>
+                    </View>
+                  }
+                />
+              </>
+            )}
+          </>
+        ) : (
+          // Modo explorador — sin dispositivo vinculado
+          <View style={ss.sinDispWrap}>
+            <MaterialCommunityIcons name="map-search-outline" size={38} color={C.text3} />
+            <Text style={ss.sinDispTitulo}>Modo explorador</Text>
+            <Text style={ss.sinDispSub}>
+              Estás explorando datos de la red pública. Vincula tu EcoG Station para ver tus propias lecturas.
+            </Text>
+            <TouchableOpacity
+              style={ss.vincularBtn}
+              onPress={vincularDispositivo}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="link-outline" size={15} color={C.green} />
+              <Text style={ss.vincularBtnTxt}>Vincular dispositivo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={ss.tiendaLink}
+              onPress={() => setMostrarTienda(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="storefront-outline" size={13} color={C.text3} />
+              <Text style={ss.tiendaLinkTxt}>¿No tienes uno? Ir a la tienda</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Card>
+
       {/* ── ESTADO DEL SISTEMA ──────────────────────── */}
       <Card style={ss.card}>
         <Text style={ss.sectionTitle}>Estado del sistema</Text>
@@ -318,38 +411,41 @@ export default function ScreenAjustes() {
             </View>
           }
         />
-        <View style={ss.div} />
 
-        <Row
-          icon="hardware-chip"
-          label="Estación"
-          sub={online ? "estacion_01 — En línea" : "estacion_01 — Sin conexión"}
-          right={
-            <View style={[ss.nivelBadge, { backgroundColor:info.color+"22", borderColor:info.color+"44" }]}>
-              <Text style={[ss.nivelTxt, { color:info.color }]}>{info.label}</Text>
-            </View>
-          }
-        />
-        <View style={ss.div} />
+        {tieneDispositivo && (
+          <>
+            <View style={ss.div} />
+            <Row
+              icon="time-outline"
+              label="Última actualización"
+              sub={online ? "Datos en tiempo real" : "Dispositivo sin conexión"}
+              right={
+                <Text style={[ss.gris, !online && { color: C.text3 }]}>
+                  {timeSince(stationData?.timestamp) ? `hace ${timeSince(stationData?.timestamp)}` : "Sin datos"}
+                </Text>
+              }
+            />
+            <View style={ss.div} />
+            <Row
+              icon="cellular"
+              label="Intervalo de envío"
+              sub="Frecuencia de datos del ESP32"
+              right={<Text style={ss.verde}>30 seg</Text>}
+            />
+          </>
+        )}
 
-        <Row
-          icon="time-outline"
-          label="Última actualización"
-          sub={isDeviceOnline(data) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
-          right={
-            <Text style={[ss.gris, !isDeviceOnline(data) && { color:C.text3 }]}>
-              {timeSince(data?.timestamp) ? `hace ${timeSince(data?.timestamp)}` : "Sin datos"}
-            </Text>
-          }
-        />
-        <View style={ss.div} />
-
-        <Row
-          icon="cellular"
-          label="Intervalo de envío"
-          sub="Frecuencia de datos del ESP32"
-          right={<Text style={ss.verde}>30 seg</Text>}
-        />
+        {!tieneDispositivo && (
+          <>
+            <View style={ss.div} />
+            <Row
+              icon="hardware-chip"
+              label="Sin dispositivo vinculado"
+              sub="Vincula un EcoG Station desde Mi dispositivo"
+              right={<Ionicons name="arrow-forward" size={16} color={C.text3} />}
+            />
+          </>
+        )}
       </Card>
 
       {/* ── PREFERENCIAS ────────────────────────────── */}
@@ -357,7 +453,6 @@ export default function ScreenAjustes() {
         <Text style={ss.sectionTitle}>Preferencias</Text>
         <View style={ss.div} />
 
-        {/* Alertas */}
         <Row
           icon="warning-outline"
           label="Alertas de calidad del aire"
@@ -375,24 +470,26 @@ export default function ScreenAjustes() {
             />
           }
         />
-        <View style={ss.div} />
 
-        {/* Probar alerta */}
-        <Row
-          icon="notifications-outline"
-          label="Probar alerta"
-          sub="Muestra una alerta de prueba ahora"
-          onPress={probarAlerta}
-          right={
-            <View style={ss.probarBtn}>
-              <Ionicons name="play" size={12} color={C.green} />
-              <Text style={ss.probarTxt}>Probar</Text>
-            </View>
-          }
-        />
+        {tieneDispositivo && (
+          <>
+            <View style={ss.div} />
+            <Row
+              icon="notifications-outline"
+              label="Probar alerta"
+              sub="Muestra una alerta de prueba ahora"
+              onPress={probarAlerta}
+              right={
+                <View style={ss.probarBtn}>
+                  <Ionicons name="play" size={12} color={C.green} />
+                  <Text style={ss.probarTxt}>Probar</Text>
+                </View>
+              }
+            />
+          </>
+        )}
       </Card>
 
-      {/* Banner si las alertas están activas */}
       {notifAlertas && (
         <View style={ss.activoBanner}>
           <Ionicons name="shield-checkmark" size={18} color={C.green} />
@@ -406,45 +503,45 @@ export default function ScreenAjustes() {
       )}
 
       {/* ── REDES WIFI — solo admin ─────────────────── */}
-      {isAdmin && <Card style={ss.card}>
-        <View style={ss.wifiHeader}>
-          <Text style={ss.sectionTitle}>Redes WiFi del dispositivo</Text>
-          <TouchableOpacity onPress={() => setModalRed(true)} style={ss.addBtn}>
-            <Ionicons name="add" size={16} color={C.green} />
-            <Text style={ss.addBtnTxt}>Agregar</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={ss.rowSub}>
-          El ESP32 las prueba en orden al encender. Los cambios aplican en el siguiente arranque.
-        </Text>
+      {isAdmin && (
+        <Card style={ss.card}>
+          <View style={ss.wifiHeader}>
+            <Text style={ss.sectionTitle}>Redes WiFi del dispositivo</Text>
+            <TouchableOpacity onPress={() => setModalRed(true)} style={ss.addBtn}>
+              <Ionicons name="add" size={16} color={C.green} />
+              <Text style={ss.addBtnTxt}>Agregar</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={ss.rowSub}>
+            El ESP32 las prueba en orden al encender. Los cambios aplican en el siguiente arranque.
+          </Text>
 
-        {redes.length === 0
-          ? <View style={ss.emptyRed}>
-              <Ionicons name="wifi-outline" size={28} color={C.text3} />
-              <Text style={ss.emptyRedTxt}>Sin redes configuradas</Text>
-            </View>
-          : redes.map((red, i) => (
-              <View key={red.id} style={[ss.redRow, i < redes.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }]}>
-                <Ionicons name="wifi" size={16} color={C.green} style={{ marginRight: 10 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={ss.redSSID}>{red.ssid}</Text>
-                  <Text style={ss.redPass}>{red.password ? "••••••••" : "Red abierta"}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => Alert.alert("Eliminar red", `¿Quitar "${red.ssid}"?`, [
-                    { text: "Cancelar" },
-                    { text: "Eliminar", style: "destructive", onPress: () => eliminar(red.id) },
-                  ])}
-                  style={ss.deleteBtn}
-                >
-                  <Ionicons name="trash-outline" size={16} color={C.text3} />
-                </TouchableOpacity>
+          {redes.length === 0
+            ? <View style={ss.emptyRed}>
+                <Ionicons name="wifi-outline" size={28} color={C.text3} />
+                <Text style={ss.emptyRedTxt}>Sin redes configuradas</Text>
               </View>
-            ))
-        }
-      </Card>
-
-      }
+            : redes.map((red, i) => (
+                <View key={red.id} style={[ss.redRow, i < redes.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }]}>
+                  <Ionicons name="wifi" size={16} color={C.green} style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={ss.redSSID}>{red.ssid}</Text>
+                    <Text style={ss.redPass}>{red.password ? "••••••••" : "Red abierta"}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert("Eliminar red", `¿Quitar "${red.ssid}"?`, [
+                      { text: "Cancelar" },
+                      { text: "Eliminar", style: "destructive", onPress: () => eliminar(red.id) },
+                    ])}
+                    style={ss.deleteBtn}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={C.text3} />
+                  </TouchableOpacity>
+                </View>
+              ))
+          }
+        </Card>
+      )}
 
       <View style={{ height: 24 }} />
 
@@ -453,6 +550,15 @@ export default function ScreenAjustes() {
         onClose={() => setModalRed(false)}
         onGuardar={agregar}
       />
+
+      {/* Modal Tienda */}
+      <Modal
+        visible={mostrarTienda}
+        animationType="slide"
+        onRequestClose={() => setMostrarTienda(false)}
+      >
+        <ScreenTienda onBack={() => setMostrarTienda(false)} />
+      </Modal>
     </ScrollView>
   );
 }
@@ -473,7 +579,8 @@ const ss = StyleSheet.create({
                      paddingVertical:4, borderRadius:10 },
   estadoDot:       { width:6, height:6, borderRadius:3, backgroundColor:C.green },
   estadoTxt:       { fontSize:11, fontWeight:"700", color:C.green },
-  nivelBadge:      { paddingHorizontal:10, paddingVertical:4, borderRadius:10 },
+  nivelBadge:      { paddingHorizontal:10, paddingVertical:4, borderRadius:10,
+                     borderWidth:1 },
   nivelTxt:        { fontSize:11, fontWeight:"700" },
   probarBtn:       { flexDirection:"row", alignItems:"center", gap:4,
                      backgroundColor:C.green+"12", paddingHorizontal:10,
@@ -493,6 +600,18 @@ const ss = StyleSheet.create({
   loginError:  { fontFamily:"Outfit_400Regular", fontSize:12, color:C.red, marginBottom:4 },
   loginBtn:    { paddingVertical:12, borderRadius:12, alignItems:"center", marginTop:4 },
   loginBtnTxt: { fontFamily:"Outfit_700Bold", fontSize:14, color:"#fff" },
+  // Mi dispositivo — sin dispositivo
+  sinDispWrap:   { alignItems:"center", paddingVertical:16, paddingTop:8 },
+  sinDispTitulo: { fontFamily:"Outfit_700Bold", fontSize:14, color:C.text, marginTop:12, marginBottom:6 },
+  sinDispSub:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3,
+                   textAlign:"center", lineHeight:18, marginBottom:18 },
+  vincularBtn:   { flexDirection:"row", alignItems:"center", gap:8,
+                   backgroundColor:C.green+"14", borderRadius:12,
+                   paddingHorizontal:20, paddingVertical:12, marginBottom:10,
+                   borderWidth:1.5, borderColor:C.green+"30" },
+  vincularBtnTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.green },
+  tiendaLink:    { flexDirection:"row", alignItems:"center", gap:6 },
+  tiendaLinkTxt: { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3 },
   // Redes WiFi
   wifiHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
   addBtn:       { flexDirection:"row", alignItems:"center", gap:4,
@@ -504,6 +623,12 @@ const ss = StyleSheet.create({
   redSSID:      { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
   redPass:      { fontFamily:"JetBrainsMono_400Regular", fontSize:11, color:C.text3, marginTop:2 },
   deleteBtn:    { padding:6 },
+  // Input (modales)
+  inputLabel:   { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text2, marginBottom:6 },
+  input:        { backgroundColor:C.bg2, borderRadius:10, paddingHorizontal:14, paddingVertical:10,
+                  fontFamily:"Outfit_400Regular", fontSize:14, color:C.text, marginBottom:14 },
+  inputRow:     { flexDirection:"row", alignItems:"center", gap:8, marginBottom:14 },
+  eyeBtn:       { padding:8, backgroundColor:C.bg2, borderRadius:10 },
   // Modal
   modalOverlay: { flex:1, backgroundColor:"rgba(28,43,30,.45)", justifyContent:"center",
                   alignItems:"center", padding:24 },
@@ -512,11 +637,6 @@ const ss = StyleSheet.create({
                   shadowOpacity:.12, shadowRadius:24, elevation:12 },
   modalTitle:   { fontFamily:"Outfit_700Bold", fontSize:16, color:C.text, marginBottom:4 },
   modalHint:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3, marginBottom:20 },
-  inputLabel:   { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text2, marginBottom:6 },
-  input:        { backgroundColor:C.bg2, borderRadius:10, paddingHorizontal:14, paddingVertical:10,
-                  fontFamily:"Outfit_400Regular", fontSize:14, color:C.text, marginBottom:14 },
-  inputRow:     { flexDirection:"row", alignItems:"center", gap:8, marginBottom:14 },
-  eyeBtn:       { padding:8, backgroundColor:C.bg2, borderRadius:10 },
   modalBtns:    { flexDirection:"row", gap:10, marginTop:4 },
   modalBtnSec:  { flex:1, paddingVertical:12, borderRadius:12, backgroundColor:C.bg2,
                   alignItems:"center" },
