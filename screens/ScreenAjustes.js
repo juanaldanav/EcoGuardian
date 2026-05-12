@@ -156,28 +156,12 @@ export default function ScreenAjustes() {
     );
   }
 
-  // Abre el wizard de configuración de nuevo para vincular un dispositivo
   async function vincularDispositivo() {
-    Alert.alert(
-      "Vincular dispositivo",
-      "Se abrirá el asistente de configuración para vincular tu EcoG Station. ¿Continuar?",
-      [
-        { text: "Cancelar" },
-        {
-          text: "Continuar",
-          onPress: async () => {
-            try {
-              await update(dbRef(db, `usuarios/${user.uid}`), {
-                onboardingCompleto: false,
-              });
-              // App.js detecta el cambio en tiempo real y muestra el onboarding
-            } catch (e) {
-              Alert.alert("Error", "No se pudo iniciar el asistente. Intenta de nuevo.");
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await update(dbRef(db, `usuarios/${user.uid}`), { onboardingCompleto: false });
+    } catch (e) {
+      Alert.alert("Error", "No se pudo iniciar el asistente. Intenta de nuevo.");
+    }
   }
 
   function handleLogout() {
@@ -351,58 +335,46 @@ export default function ScreenAjustes() {
         )}
       </Card>
 
-      {/* ── ESTADO DEL SISTEMA ──────────────────────── */}
-      <Card style={ss.card}>
-        <Text style={ss.sectionTitle}>Estado del sistema</Text>
-        <View style={ss.div} />
-
-        <Row
-          icon="wifi"
-          label="Firebase"
-          sub="ecoguardian-68553-default-rtdb"
-          right={
-            <View style={ss.estadoBadge}>
-              <View style={ss.estadoDot} />
-              <Text style={ss.estadoTxt}>Conectado</Text>
-            </View>
-          }
-        />
-
-        {tieneDispositivo && (
-          <>
-            <View style={ss.div} />
-            <Row
-              icon="time-outline"
-              label="Última actualización"
-              sub={online ? "Datos en tiempo real" : "Dispositivo sin conexión"}
-              right={
-                <Text style={[ss.gris, !online && { color: C.text3 }]}>
-                  {timeSince(stationData?.timestamp) ? `hace ${timeSince(stationData?.timestamp)}` : "Sin datos"}
-                </Text>
-              }
-            />
-            <View style={ss.div} />
-            <Row
-              icon="cellular"
-              label="Intervalo de envío"
-              sub="Frecuencia de datos del ESP32"
-              right={<Text style={ss.verde}>30 seg</Text>}
-            />
-          </>
-        )}
-
-        {!tieneDispositivo && (
-          <>
-            <View style={ss.div} />
-            <Row
-              icon="hardware-chip"
-              label="Sin dispositivo vinculado"
-              sub="Vincula un EcoG Station desde Mi dispositivo"
-              right={<Ionicons name="arrow-forward" size={16} color={C.text3} />}
-            />
-          </>
-        )}
-      </Card>
+      {/* ── ESTADO DE TU ESTACIÓN ───────────────────── */}
+      {tieneDispositivo && (
+        <Card style={ss.card}>
+          <Text style={ss.sectionTitle}>Tu estación</Text>
+          <View style={ss.div} />
+          <Row
+            icon="time-outline"
+            label="Última lectura"
+            sub={online ? "Recibiendo datos en tiempo real" : "Sin conexión reciente"}
+            right={
+              <Text style={[ss.gris, !online && { color: C.text3 }]}>
+                {timeSince(stationData?.timestamp) ? `hace ${timeSince(stationData?.timestamp)}` : "—"}
+              </Text>
+            }
+          />
+          <View style={ss.div} />
+          <Row
+            icon="cellular"
+            label="Frecuencia de envío"
+            sub="El sensor manda datos cada 30 seg"
+            right={<Text style={ss.verde}>30 seg</Text>}
+          />
+          {stationData?.gps_valido && (
+            <>
+              <View style={ss.div} />
+              <Row
+                icon="location-outline"
+                label="Ubicación GPS"
+                sub={`${(stationData.lat||0).toFixed(4)}, ${(stationData.lng||0).toFixed(4)}`}
+                right={
+                  <View style={ss.estadoBadge}>
+                    <View style={ss.estadoDot} />
+                    <Text style={ss.estadoTxt}>Activo</Text>
+                  </View>
+                }
+              />
+            </>
+          )}
+        </Card>
+      )}
 
       {/* ── PREFERENCIAS ────────────────────────────── */}
       <Card style={ss.card}>
