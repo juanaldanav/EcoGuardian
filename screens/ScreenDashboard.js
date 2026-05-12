@@ -116,8 +116,12 @@ export default function ScreenDashboard() {
 
   const online   = isDeviceOnline(data);
   const lastSync = timeSince(data?.timestamp);
-  const pm25     = data?.pm25 || 0;
-  const info     = getInfo(pm25);
+  // Solo calcular calidad si el sensor está online y manda un valor real > 0
+  const hasData  = online && (data?.pm25 ?? -1) > 0;
+  const pm25     = hasData ? data.pm25 : 0;
+  const info     = hasData
+    ? getInfo(pm25)
+    : { label: "Sin datos", color: "rgba(255,255,255,0.45)", bg: "transparent", emoji: "—", score: 0 };
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -162,20 +166,26 @@ export default function ScreenDashboard() {
         <Animated.View style={{ opacity:fadeAnim }}>
           {loading
             ? <ActivityIndicator size="large" color="#fff" style={{ marginVertical:14 }} />
-            : <Text style={ss.heroNum}>{pm25 < 10 ? pm25.toFixed(1) : Math.round(pm25)}</Text>
+            : <Text style={ss.heroNum}>
+                {hasData ? (pm25 < 10 ? pm25.toFixed(1) : Math.round(pm25)) : "—"}
+              </Text>
           }
         </Animated.View>
-        <Text style={ss.heroUnit}>µg/m³ · PM2.5</Text>
+        <Text style={ss.heroUnit}>{hasData ? "µg/m³ · PM2.5" : "Sin lectura activa"}</Text>
 
-        {/* Barra de escala OMS */}
-        <View style={ss.progressWrap}>
-          <View style={[ss.progressBar, { width:`${progress}%` }]} />
-        </View>
-        <View style={ss.scaleRow}>
-          {["0","12","35","55","150+"].map(s => (
-            <Text key={s} style={ss.scaleTxt}>{s}</Text>
-          ))}
-        </View>
+        {/* Barra de escala OMS — solo cuando hay datos reales */}
+        {hasData && (
+          <>
+            <View style={ss.progressWrap}>
+              <View style={[ss.progressBar, { width:`${progress}%` }]} />
+            </View>
+            <View style={ss.scaleRow}>
+              {["0","12","35","55","150+"].map(s => (
+                <Text key={s} style={ss.scaleTxt}>{s}</Text>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* Botones de acción */}
         <View style={ss.heroBtnRow}>
@@ -237,18 +247,18 @@ export default function ScreenDashboard() {
         </Animated.View>
       )}
 
-      {/* ── SENSORES EN TIEMPO REAL ─────────────── */}
-      {data && (
+      {/* ── SENSORES EN TIEMPO REAL — solo cuando hay datos reales */}
+      {hasData && (
         <Animated.View style={{ opacity:fadeAnim }}>
           <Card style={ss.sensorCard}>
             <View style={ss.cardHeader}>
               <Text style={ss.cardTitle}>Sensores en tiempo real</Text>
               <LiveDot />
             </View>
-            <SensorRow icon="air-purifier"    label="PM2.5" value={(data.pm25||0).toFixed(1)} unit="µg/m³" color={info.color} />
-            <SensorRow icon="blur"            label="PM10"  value={(data.pm10||0).toFixed(1)} unit="µg/m³" color={C.yellow}   />
-            <SensorRow icon="molecule-co2"    label="CO₂"   value={Math.round(data.co2||0)}   unit="ppm"   color={C.text2}    />
-            <SensorRow icon="chemical-weapon" label="TVOC"  value={Math.round(data.tvoc||0)}  unit="ppb"   color={C.orange}   />
+            <SensorRow icon="air-purifier"    label="PM2.5" value={data.pm25.toFixed(1)}       unit="µg/m³" color={info.color} />
+            <SensorRow icon="blur"            label="PM10"  value={(data.pm10||0).toFixed(1)}   unit="µg/m³" color={C.yellow}   />
+            <SensorRow icon="molecule-co2"    label="CO₂"   value={Math.round(data.co2||0)}     unit="ppm"   color={C.text2}    />
+            <SensorRow icon="chemical-weapon" label="TVOC"  value={Math.round(data.tvoc||0)}    unit="ppb"   color={C.orange}   />
           </Card>
         </Animated.View>
       )}

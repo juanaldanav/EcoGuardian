@@ -14,7 +14,7 @@ import Card from "../components/Card";
 import { ref as dbRef, update, remove } from "firebase/database";
 import { db, auth } from "../constants/firebase";
 import { deleteUser } from "firebase/auth";
-import { useStations, useWifiNetworks } from "../hooks/useFirebase";
+import { useStations } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
@@ -41,70 +41,9 @@ function Row({ icon, label, sub, right, onPress }) {
     : content;
 }
 
-// ── Modal agregar red ─────────────────────────────────────────
-function ModalRed({ visible, onClose, onGuardar }) {
-  const [ssid, setSsid]       = useState("");
-  const [pass, setPass]       = useState("");
-  const [verPass, setVerPass] = useState(false);
-
-  function guardar() {
-    if (!ssid.trim()) return Alert.alert("Falta el nombre de la red");
-    onGuardar(ssid.trim(), pass);
-    setSsid(""); setPass("");
-    onClose();
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={ss.modalOverlay}>
-        <View style={ss.modalBox}>
-          <Text style={ss.modalTitle}>Agregar red WiFi</Text>
-          <Text style={ss.modalHint}>El dispositivo la usará en el próximo arranque</Text>
-
-          <Text style={ss.inputLabel}>Nombre de la red (SSID)</Text>
-          <TextInput
-            style={ss.input}
-            value={ssid}
-            onChangeText={setSsid}
-            placeholder="Mi Red WiFi"
-            placeholderTextColor={C.text3}
-            autoCapitalize="none"
-          />
-
-          <Text style={ss.inputLabel}>Contraseña</Text>
-          <View style={ss.inputRow}>
-            <TextInput
-              style={[ss.input, { flex: 1 }]}
-              value={pass}
-              onChangeText={setPass}
-              placeholder="Contraseña (vacío si es abierta)"
-              placeholderTextColor={C.text3}
-              secureTextEntry={!verPass}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity onPress={() => setVerPass(v => !v)} style={ss.eyeBtn}>
-              <Ionicons name={verPass ? "eye-off-outline" : "eye-outline"} size={18} color={C.text3} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={ss.modalBtns}>
-            <TouchableOpacity onPress={onClose} style={ss.modalBtnSec}>
-              <Text style={ss.modalBtnSecTxt}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={guardar} style={[ss.modalBtnPrim, { backgroundColor: C.green }]}>
-              <Text style={ss.modalBtnPrimTxt}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ── Pantalla Ajustes ──────────────────────────────────────────
 export default function ScreenAjustes() {
-  const { stations }                = useStations();
-  const { redes, agregar, eliminar } = useWifiNetworks();
+  const { stations } = useStations();
   const { user, perfil, isAdmin, login, logout } = useAuth();
 
   // Estaciones vinculadas al usuario
@@ -113,7 +52,12 @@ export default function ScreenAjustes() {
   const primeraId        = estacionIds[0] || null;
   const stationData      = primeraId ? (stations[primeraId] || null) : null;
   const online           = isDeviceOnline(stationData);
-  const info             = getInfo(stationData?.pm25 || 0);
+  // Solo mostrar calidad cuando hay datos reales y el sensor está online
+  const hasData          = online && (stationData?.pm25 ?? -1) > 0;
+  const info             = hasData ? getInfo(stationData.pm25) : null;
+  // Nombre amigable — prioridad: nombre del firmware, luego ID sin subrayados
+  const stationLabel     = stationData?.nombre
+    || (primeraId ? primeraId.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Mi estación");
 
   // Tick cada 30s para recalcular isDeviceOnline sin esperar evento Firebase
   const [, forceUpdate] = useState(0);
@@ -122,9 +66,8 @@ export default function ScreenAjustes() {
     return () => clearInterval(t);
   }, []);
 
-  const [notifAlertas, setNotifAlertas] = useState(false);
-  const [modalRed,     setModalRed]     = useState(false);
-  const [mostrarTienda, setMostrarTienda] = useState(false);
+  const [notifAlertas,   setNotifAlertas]   = useState(false);
+  const [mostrarTienda,  setMostrarTienda]  = useState(false);
   const alertaActivaRef = useRef(false);
 
   // Login form state
@@ -244,10 +187,11 @@ export default function ScreenAjustes() {
   }
 
   function probarAlerta() {
-    const nombreEstacion = stationData?.nombre || primeraId || "—";
+    const nivel = info?.label || "Sin datos";
+    const pm25Str = hasData ? `${stationData.pm25.toFixed(1)} µg/m³` : "Sin lectura";
     Alert.alert(
       "Prueba de Alerta",
-      `Las alertas están funcionando correctamente.\n\nEstación: ${nombreEstacion}\nPM2.5 actual: ${(stationData?.pm25||0).toFixed(1)} µg/m³\nNivel: ${info.label}`,
+      `Las alertas están funcionando correctamente.\n\nEstación: ${stationLabel}\nPM2.5 actual: ${pm25Str}\nNivel: ${nivel}`,
       [{ text: "Cerrar", style: "default" }]
     );
   }
@@ -340,7 +284,7 @@ export default function ScreenAjustes() {
           <>
             <Row
               icon="hardware-chip"
-              label={stationData?.nombre || primeraId}
+              label={stationLabel}
               sub={online ? "En línea · datos en tiempo real" : "Sin conexión reciente"}
               right={
                 <View style={[ss.estadoBadge, !online && { backgroundColor: C.border + "80" }]}>
@@ -351,7 +295,7 @@ export default function ScreenAjustes() {
                 </View>
               }
             />
-            {stationData?.pm25 != null && (
+            {hasData && info && (
               <>
                 <View style={ss.div} />
                 <Row
@@ -363,6 +307,16 @@ export default function ScreenAjustes() {
                       <Text style={[ss.nivelTxt, { color: info.color }]}>{info.label}</Text>
                     </View>
                   }
+                />
+              </>
+            )}
+            {!online && (
+              <>
+                <View style={ss.div} />
+                <Row
+                  icon="cloud-offline-outline"
+                  label="Dispositivo sin conexión"
+                  sub="El sensor no está enviando datos actualmente"
                 />
               </>
             )}
@@ -502,54 +456,7 @@ export default function ScreenAjustes() {
         </View>
       )}
 
-      {/* ── REDES WIFI — solo admin ─────────────────── */}
-      {isAdmin && (
-        <Card style={ss.card}>
-          <View style={ss.wifiHeader}>
-            <Text style={ss.sectionTitle}>Redes WiFi del dispositivo</Text>
-            <TouchableOpacity onPress={() => setModalRed(true)} style={ss.addBtn}>
-              <Ionicons name="add" size={16} color={C.green} />
-              <Text style={ss.addBtnTxt}>Agregar</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={ss.rowSub}>
-            El ESP32 las prueba en orden al encender. Los cambios aplican en el siguiente arranque.
-          </Text>
-
-          {redes.length === 0
-            ? <View style={ss.emptyRed}>
-                <Ionicons name="wifi-outline" size={28} color={C.text3} />
-                <Text style={ss.emptyRedTxt}>Sin redes configuradas</Text>
-              </View>
-            : redes.map((red, i) => (
-                <View key={red.id} style={[ss.redRow, i < redes.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border }]}>
-                  <Ionicons name="wifi" size={16} color={C.green} style={{ marginRight: 10 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={ss.redSSID}>{red.ssid}</Text>
-                    <Text style={ss.redPass}>{red.password ? "••••••••" : "Red abierta"}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => Alert.alert("Eliminar red", `¿Quitar "${red.ssid}"?`, [
-                      { text: "Cancelar" },
-                      { text: "Eliminar", style: "destructive", onPress: () => eliminar(red.id) },
-                    ])}
-                    style={ss.deleteBtn}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={C.text3} />
-                  </TouchableOpacity>
-                </View>
-              ))
-          }
-        </Card>
-      )}
-
       <View style={{ height: 24 }} />
-
-      <ModalRed
-        visible={modalRed}
-        onClose={() => setModalRed(false)}
-        onGuardar={agregar}
-      />
 
       {/* Modal Tienda */}
       <Modal
@@ -612,35 +519,10 @@ const ss = StyleSheet.create({
   vincularBtnTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.green },
   tiendaLink:    { flexDirection:"row", alignItems:"center", gap:6 },
   tiendaLinkTxt: { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3 },
-  // Redes WiFi
-  wifiHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
-  addBtn:       { flexDirection:"row", alignItems:"center", gap:4,
-                  paddingHorizontal:10, paddingVertical:5, borderRadius:8, backgroundColor:C.green+"12" },
-  addBtnTxt:    { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.green },
-  emptyRed:     { alignItems:"center", paddingVertical:20, gap:8 },
-  emptyRedTxt:  { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3 },
-  redRow:       { flexDirection:"row", alignItems:"center", paddingVertical:12 },
-  redSSID:      { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
-  redPass:      { fontFamily:"JetBrainsMono_400Regular", fontSize:11, color:C.text3, marginTop:2 },
-  deleteBtn:    { padding:6 },
-  // Input (modales)
+  // Input (login form)
   inputLabel:   { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text2, marginBottom:6 },
   input:        { backgroundColor:C.bg2, borderRadius:10, paddingHorizontal:14, paddingVertical:10,
                   fontFamily:"Outfit_400Regular", fontSize:14, color:C.text, marginBottom:14 },
   inputRow:     { flexDirection:"row", alignItems:"center", gap:8, marginBottom:14 },
   eyeBtn:       { padding:8, backgroundColor:C.bg2, borderRadius:10 },
-  // Modal
-  modalOverlay: { flex:1, backgroundColor:"rgba(28,43,30,.45)", justifyContent:"center",
-                  alignItems:"center", padding:24 },
-  modalBox:     { backgroundColor:C.card, borderRadius:20, padding:24, width:"100%",
-                  shadowColor:"#1C2B1E", shadowOffset:{width:0,height:8},
-                  shadowOpacity:.12, shadowRadius:24, elevation:12 },
-  modalTitle:   { fontFamily:"Outfit_700Bold", fontSize:16, color:C.text, marginBottom:4 },
-  modalHint:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text3, marginBottom:20 },
-  modalBtns:    { flexDirection:"row", gap:10, marginTop:4 },
-  modalBtnSec:  { flex:1, paddingVertical:12, borderRadius:12, backgroundColor:C.bg2,
-                  alignItems:"center" },
-  modalBtnSecTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:14, color:C.text2 },
-  modalBtnPrim: { flex:1, paddingVertical:12, borderRadius:12, alignItems:"center" },
-  modalBtnPrimTxt:{ fontFamily:"Outfit_700Bold", fontSize:14, color:"#fff" },
 });
