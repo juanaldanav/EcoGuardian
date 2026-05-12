@@ -12,14 +12,18 @@ export function getInfo(pm25) {
   return                          { label:"Peligroso", color:C.purple, bg:C.purple +"15", emoji:"🟣", score: 500                       };
 }
 
-// true si el dispositivo envió un dato en los últimos 120 segundos.
-// Usa únicamente el timestamp NTP del firmware — no confiar en receivedAt
-// (ese campo se eliminó del hook porque se sobrescribía con Date.now() local).
-export function isDeviceOnline(data) {
+// true si el dispositivo envió un dato en los últimos 90 segundos.
+// Primero usa el timestamp NTP del firmware (Unix epoch); si NTP falló el
+// firmware manda uptime (< 1e9), así que caemos al lastReceived del hook
+// (Date.now() local de cuando llegó el snapshot a Firebase).
+export function isDeviceOnline(data, lastReceived) {
   if (!data) return false;
+  const now = Date.now() / 1000;
+  const THRESHOLD = 90;
   const { timestamp } = data;
-  if (!timestamp || timestamp <= 1_000_000_000) return false;
-  return (Date.now() / 1000 - timestamp) < 120;
+  if (timestamp && timestamp > 1_000_000_000) return (now - timestamp) < THRESHOLD;
+  if (lastReceived) return (now - lastReceived) < THRESHOLD;
+  return false;
 }
 
 export function timeSince(ts) {

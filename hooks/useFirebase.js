@@ -24,24 +24,28 @@ export function useStations() {
 }
 
 // Hook: datos en tiempo real de la estación
-export function useStation() {
+export function useStation(stationId) {
   const [data,         setData]         = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [lastReceived, setLastReceived] = useState(null);
   const [, setTick]                     = useState(0);
 
   useEffect(() => {
+    if (!stationId) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
     goOnline(db);
-    const r = ref(db, "estaciones/estacion_01");
+    const r = ref(db, `estaciones/${stationId}`);
     const unsub = onValue(r, snap => {
       const val = snap.val();
       setData(val);
-      // Registra cuándo llegó este snapshot a la app (no depende de NTP)
       if (val) setLastReceived(Date.now() / 1000);
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [stationId]);
 
   // Re-render cada 30 s para que isDeviceOnline() recalcule
   useEffect(() => {
@@ -53,23 +57,29 @@ export function useStation() {
 }
 
 // Hook: historial de lecturas
-export function useHistory() {
-  const [hist, setHist]     = useState([]);
+export function useHistory(stationId) {
+  const [hist, setHist]       = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!stationId) {
+      setHist([]);
+      setLoading(false);
+      return;
+    }
     const r = query(
-      ref(db, "historial/estacion_01"),
+      ref(db, `historial/${stationId}`),
       orderByKey(),
       limitToLast(30)
     );
     const unsub = onValue(r, snap => {
       const v = snap.val();
       if (v) setHist(Object.entries(v).reverse().map(([ts, d]) => ({ ts, ...d })));
+      else   setHist([]);
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [stationId]);
 
   return { hist, loading };
 }

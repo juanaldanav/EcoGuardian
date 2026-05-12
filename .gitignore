@@ -50,3 +50,6 @@ firebase-adminsdk*.json
 .env.local
 .env.production
 .env.development
+
+# Firmware — credenciales WiFi locales
+firmware/secrets.h

@@ -11,6 +11,7 @@ import Card      from "../components/Card";
 import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
+import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
 import { C } from "../constants/colors";
 
@@ -110,8 +111,11 @@ function ResumenModal({ visible, onClose, data, hist }) {
 
 // ── Pantalla principal ────────────────────────────────────────
 export default function ScreenDashboard() {
-  const { data, loading } = useStation();
-  const { hist }          = useHistory();
+  const { perfil }        = useAuth();
+  const estacionIds       = Object.keys(perfil?.estaciones || {});
+  const stationId         = estacionIds[0] || null;
+  const { data, loading } = useStation(stationId);
+  const { hist }          = useHistory(stationId);
   const [modalVisible, setModalVisible] = useState(false);
 
   const online   = isDeviceOnline(data);
@@ -143,6 +147,20 @@ export default function ScreenDashboard() {
 
   // Mini bar chart desde historial
   const chartBars = hist ? hist.slice(-18) : [];
+
+  if (!stationId) {
+    return (
+      <View style={ss.emptyWrap}>
+        <View style={ss.emptyIcoBox}>
+          <MaterialCommunityIcons name="access-point-off" size={36} color={C.text3} />
+        </View>
+        <Text style={ss.emptyTitle}>Sin dispositivo vinculado</Text>
+        <Text style={ss.emptyDesc}>
+          Ve a Ajustes para vincular tu estación EcoGuardian o explorar los datos de la red.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false}>
@@ -380,6 +398,13 @@ const ss = StyleSheet.create({
   alertTitle:        { fontFamily:"Outfit_700Bold", fontSize:14, color:C.red, marginBottom:6 },
   alertDesc:         { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text, lineHeight:18 },
 
+  // Empty (no station)
+  emptyWrap:         { flex:1, alignItems:"center", justifyContent:"center", padding:40, gap:12 },
+  emptyIcoBox:       { width:72, height:72, borderRadius:20, backgroundColor:C.bg2,
+                       alignItems:"center", justifyContent:"center", marginBottom:4 },
+  emptyTitle:        { fontFamily:"Outfit_700Bold", fontSize:18, color:C.text, textAlign:"center" },
+  emptyDesc:         { fontFamily:"Outfit_400Regular", fontSize:13, color:C.text2,
+                       textAlign:"center", lineHeight:20 },
   // Modal
   modalOverlay:      { flex:1, backgroundColor:"rgba(28,43,30,.55)",
                        justifyContent:"center", alignItems:"center", padding:20 },

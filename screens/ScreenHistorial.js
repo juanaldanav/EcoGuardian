@@ -6,19 +6,37 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Card from "../components/Card";
 import { useHistory } from "../hooks/useFirebase";
+import { useAuth } from "../hooks/useAuth";
 import { getInfo, fmtTime } from "../utils/helpers";
 import { C } from "../constants/colors";
 
 const FILAS_INICIALES = 5;
 
 export default function ScreenHistorial() {
-  const { hist, loading } = useHistory();
+  const { perfil }        = useAuth();
+  const estacionIds       = Object.keys(perfil?.estaciones || {});
+  const stationId         = estacionIds[0] || null;
+  const { hist, loading } = useHistory(stationId);
   const [barSel, setBarSel]       = useState(null);
   const [mostrarTodo, setMostrar] = useState(false);
 
   const maxPM = hist.length ? Math.max(...hist.map(h => h.pm25 || 0), 1) : 1;
   const barras = hist.slice(0, 20).reverse();
   const filas  = mostrarTodo ? hist : hist.slice(0, FILAS_INICIALES);
+
+  if (!stationId) {
+    return (
+      <View style={ss.emptyWrap}>
+        <View style={ss.emptyIcoBox}>
+          <MaterialCommunityIcons name="chart-timeline-variant-shimmer" size={36} color={C.text3} />
+        </View>
+        <Text style={ss.emptyTitle}>Sin historial disponible</Text>
+        <Text style={ss.emptyDesc}>
+          Vincula una estación EcoGuardian desde Ajustes para ver el historial de lecturas.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -162,6 +180,12 @@ export default function ScreenHistorial() {
 }
 
 const ss = StyleSheet.create({
+  emptyWrap:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 },
+  emptyIcoBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: C.bg2,
+                 alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  emptyTitle:  { fontFamily: "Outfit_700Bold", fontSize: 18, color: C.text, textAlign: "center" },
+  emptyDesc:   { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text2,
+                 textAlign: "center", lineHeight: 20 },
   card:        { marginHorizontal: 16, marginTop: 4, marginBottom: 12 },
   cardHeader:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   cardTitle:   { fontFamily: "Outfit_600SemiBold", fontSize: 13, color: C.text },
