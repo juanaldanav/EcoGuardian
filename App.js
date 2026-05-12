@@ -23,6 +23,7 @@ import ScreenAjustes    from "./screens/ScreenAjustes";
 import ScreenComunidad  from "./screens/ScreenComunidad";
 import ScreenLogin      from "./screens/ScreenLogin";
 import ScreenOnboarding from "./screens/ScreenOnboarding";
+import ScreenSplash     from "./screens/ScreenSplash";
 import { useAuth }      from "./hooks/useAuth";
 import { C } from "./constants/colors";
 import { F } from "./constants/fonts";
@@ -139,15 +140,26 @@ export default function App() {
 
   const { user, perfil, loading: authLoading } = useAuth();
 
-  // Si los TTF tardan más de 2.5 s o fallan, renderizamos igual (fallback a sistema)
-  const [timedOut, setTimedOut] = useState(false);
+  const [timedOut,    setTimedOut]    = useState(false);
+  const [splashDone,  setSplashDone]  = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setTimedOut(true), 2500);
     return () => clearTimeout(t);
   }, []);
 
-  // Espera fuentes y auth antes de decidir qué mostrar
-  if ((!fontsLoaded && !fontError && !timedOut) || authLoading) {
+  const fontsReady = fontsLoaded || fontError || timedOut;
+
+  // Splash siempre al abrir — espera a que terminen fuentes y auth
+  if (!splashDone) {
+    return (
+      <SafeAreaProvider>
+        <ScreenSplash onDone={() => setSplashDone(true)} />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (!fontsReady || authLoading) {
     return <View style={{ flex: 1, backgroundColor: C.bg }} />;
   }
 
