@@ -5,11 +5,9 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Dimensions, Platform } from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
-import Card      from "../components/Card";
-import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation } from "../hooks/useFirebase";
-import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
+import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -139,40 +137,57 @@ export default function ScreenMapa() {
         </View>
       </View>
 
-      {/* ── INFO ESTACIÓN ───────────────────────────── */}
-      <Card style={ss.card}>
-        <View style={ss.cardHeader}>
-          <Text style={ss.cardTitle}>Ubicación de la estación</Text>
-          <LiveDot />
+      {/* ── BOTTOM SHEET ESTACIÓN ───────────────────── */}
+      <View style={ss.bottomSheet}>
+        {/* Cabecera: nombre + nivel pill */}
+        <View style={ss.sheetTop}>
+          <View style={{ flex:1 }}>
+            <Text style={ss.stationName}>{data?.nombre || "Estación 1"}</Text>
+            {data?.lat && data?.lng && data.lat !== 0 && (
+              <Text style={ss.stationCoords}>
+                {data.lat.toFixed(5)} °N · {data.lng.toFixed(5)} °O
+              </Text>
+            )}
+          </View>
+          <View style={[ss.levelPill, { backgroundColor:info.color+"18" }]}>
+            <Text style={[ss.levelPillTxt, { color:info.color }]}>
+              {info.label.toUpperCase()}
+            </Text>
+          </View>
         </View>
 
-        {/* Aviso si el GPS no tiene señal */}
+        {/* Aviso GPS sin señal */}
         {!data?.gps_valido && (
           <View style={ss.gpsSinSenal}>
-            <MaterialCommunityIcons name="satellite-variant" size={14} color={C.orange} />
+            <MaterialCommunityIcons name="satellite-variant" size={13} color={C.orange} />
             <Text style={ss.gpsSinSenalTxt}>
-              {data?.lat
-                ? "Sin fix GPS — mostrando última posición registrada del dispositivo."
-                : "GPS buscando señal — sin posición aún."}
+              {data?.lat ? "Última posición conocida" : "GPS buscando señal"}
             </Text>
           </View>
         )}
 
-        <SensorRow
-          icon="map-marker"
-          label="Estación"
-          value={data?.nombre || "Estacion 1"}
-          unit=""
-          color={C.green}
-        />
-        <SensorRow
-          icon="clock-outline"
-          label="Última actualización"
-          value={timeSince(data?.receivedAt) ?? "Sin datos"}
-          unit=""
-          color={isDeviceOnline(data) ? C.text2 : C.text3}
-        />
-      </Card>
+        {/* Grid de valores */}
+        <View style={ss.valsGrid}>
+          {[
+            { lbl:"PM2.5", val:(data?.pm25||0).toFixed(1), color:info.color },
+            { lbl:"PM10",  val:(data?.pm10||0).toFixed(1), color:C.yellow   },
+            { lbl:"CO₂",  val:Math.round(data?.co2||0),   color:C.text2    },
+          ].map((item, i) => (
+            <View key={i} style={ss.valBox}>
+              <Text style={ss.valLbl}>{item.lbl}</Text>
+              <Text style={[ss.valNum, { color:item.color }]}>{item.val}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Última actualización */}
+        <View style={ss.sheetFooter}>
+          <LiveDot />
+          <Text style={ss.sheetFooterTxt}>
+            Actualizado hace {timeSince(data?.receivedAt) ?? "---"}
+          </Text>
+        </View>
+      </View>
 
       <View style={{ height:24 }} />
     </ScrollView>
@@ -200,11 +215,26 @@ const ss = StyleSheet.create({
                   alignItems:"center", gap:4, paddingHorizontal:10,
                   paddingVertical:6, borderRadius:10 },
   gpsBadgeTxt:  { fontSize:10, fontWeight:"700" },
-  card:         { marginHorizontal:16, marginBottom:12 },
-  cardHeader:   { flexDirection:"row", alignItems:"center", justifyContent:"space-between",
-                  marginBottom:12 },
-  cardTitle:    { fontSize:13, fontWeight:"700", color:C.text },
-  gpsSinSenal:  { flexDirection:"row", alignItems:"flex-start", gap:8,
-                  paddingVertical:8, marginBottom:8 },
-  gpsSinSenalTxt:{ flex:1, fontSize:11, color:C.text3, lineHeight:16 },
+  bottomSheet:   { marginHorizontal:16, marginBottom:12,
+                   backgroundColor:C.card, borderRadius:18, padding:14,
+                   shadowColor:"#1C2B1E", shadowOffset:{width:0,height:-2},
+                   shadowOpacity:.08, shadowRadius:12, elevation:4 },
+  sheetTop:      { flexDirection:"row", alignItems:"flex-start", gap:10, marginBottom:8 },
+  stationName:   { fontFamily:"Outfit_600SemiBold", fontSize:14, color:C.text, lineHeight:20 },
+  stationCoords: { fontFamily:"JetBrainsMono_400Regular", fontSize:9,
+                   color:C.text3, marginTop:2 },
+  levelPill:     { paddingHorizontal:10, paddingVertical:4, borderRadius:8 },
+  levelPillTxt:  { fontFamily:"JetBrainsMono_400Regular", fontSize:9,
+                   fontWeight:"700", letterSpacing:1 },
+  gpsSinSenal:   { flexDirection:"row", alignItems:"center", gap:6,
+                   marginBottom:8 },
+  gpsSinSenalTxt:{ fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3 },
+  valsGrid:      { flexDirection:"row", gap:8, marginBottom:10 },
+  valBox:        { flex:1, backgroundColor:C.bg2, borderRadius:10, padding:10,
+                   alignItems:"center" },
+  valLbl:        { fontFamily:"JetBrainsMono_400Regular", fontSize:8,
+                   color:C.text3, letterSpacing:0.8, marginBottom:4 },
+  valNum:        { fontFamily:"JetBrainsMono_400Regular", fontSize:15, fontWeight:"700" },
+  sheetFooter:   { flexDirection:"row", alignItems:"center", gap:6 },
+  sheetFooterTxt:{ fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3 },
 });

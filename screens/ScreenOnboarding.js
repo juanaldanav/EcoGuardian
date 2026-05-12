@@ -218,11 +218,19 @@ export default function ScreenOnboarding({ uid, nombre }) {
             <Text style={ss.stepSub}>
               Encuéntralo en la parte inferior del dispositivo o en la caja.
             </Text>
+            {Platform.OS === "web" && (
+              <View style={ss.webCameraTip}>
+                <Ionicons name="phone-portrait-outline" size={14} color={C.text3} />
+                <Text style={ss.webCameraTipTxt}>
+                  Con la app instalada en tu celular puedes escanear el QR con la cámara
+                </Text>
+              </View>
+            )}
             <TextInput
               style={ss.input}
               value={codigoInput}
               onChangeText={setCodigoInput}
-              placeholder="estacion_01"
+              placeholder="Código del dispositivo"
               placeholderTextColor={C.text3}
               autoCapitalize="none"
               autoCorrect={false}
@@ -455,4 +463,8 @@ const ss = StyleSheet.create({
   cameraBtn:    { backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 12,
                   borderRadius: 12 },
   cameraBtnTxt: { fontFamily: "Outfit_700Bold", fontSize: 14, color: "#fff" },
+  webCameraTip: { flexDirection: "row", alignItems: "center", gap: 8,
+                  backgroundColor: C.bg2, borderRadius: 10, padding: 12, marginBottom: 16 },
+  webCameraTipTxt: { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.text3,
+                     flex: 1, lineHeight: 18 },
 });
