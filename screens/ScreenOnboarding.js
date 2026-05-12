@@ -68,6 +68,12 @@ function StationPicker({ onSelect }) {
           ? "Encontramos 1 dispositivo disponible. Tócalo para vincularlo a tu cuenta."
           : `Encontramos ${estaciones.length} dispositivos. Toca el tuyo para vincularlo.`}
       </Text>
+      <View style={ss.deviceHint}>
+        <Ionicons name="information-circle-outline" size={14} color={C.text3} />
+        <Text style={ss.deviceHintTxt}>
+          Asegúrate de que el dispositivo esté encendido y conectado a WiFi antes de continuar. Si la lista está vacía, espera ~30 seg y regresa.
+        </Text>
+      </View>
       {estaciones.map(e => (
         <TouchableOpacity
           key={e.id}
@@ -666,6 +672,11 @@ const ss = StyleSheet.create({
   // StationPicker
   pickerLoading:    { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   pickerLoadingTxt: { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text3 },
+  deviceHint:       { flexDirection: "row", alignItems: "flex-start", gap: 8,
+                      backgroundColor: C.bg2, borderRadius: 12,
+                      padding: 12, marginBottom: 20 },
+  deviceHintTxt:    { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.text3,
+                      flex: 1, lineHeight: 18 },
   stationCard:      { flexDirection: "row", alignItems: "center",
                       backgroundColor: C.card, borderRadius: 16,
                       padding: 16, marginBottom: 12,

@@ -11,9 +11,8 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
-import { ref as dbRef, update, remove } from "firebase/database";
-import { db, auth } from "../constants/firebase";
-import { deleteUser } from "firebase/auth";
+import { ref as dbRef, update } from "firebase/database";
+import { db } from "../constants/firebase";
 import { useStations } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
@@ -135,7 +134,7 @@ export default function ScreenAjustes() {
   async function resetearDemo() {
     Alert.alert(
       "Reiniciar demo",
-      "Esto borrará el onboarding y los dispositivos vinculados de tu cuenta. Tendrás que registrar el dispositivo de nuevo. ¿Continuar?",
+      "Esto reiniciará el onboarding y desvinculará los dispositivos de tu cuenta. Tu sesión se mantiene. ¿Continuar?",
       [
         { text: "Cancelar" },
         {
@@ -143,10 +142,13 @@ export default function ScreenAjustes() {
           style: "destructive",
           onPress: async () => {
             try {
-              await remove(dbRef(db, `usuarios/${user.uid}`));
-              await deleteUser(auth.currentUser);
+              await update(dbRef(db, `usuarios/${user.uid}`), {
+                onboardingCompleto: false,
+                estaciones:         null,
+              });
+              // App.js detecta el cambio en tiempo real y muestra el onboarding
             } catch (e) {
-              Alert.alert("Error", "No se pudo reiniciar el demo. Cierra sesión y vuelve a intentarlo.");
+              Alert.alert("Error", "No se pudo reiniciar. Intenta de nuevo.");
             }
           },
         },
