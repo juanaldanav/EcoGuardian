@@ -8,7 +8,7 @@ import {
   ActivityIndicator, Image, ScrollView, Platform, Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { ref, update } from "firebase/database";
+import { ref, update, get } from "firebase/database";
 import { db } from "../constants/firebase";
 import { C } from "../constants/colors";
 
@@ -19,6 +19,70 @@ if (Platform.OS !== "web") {
   const cam = require("expo-camera");
   CameraView = cam.CameraView;
   useCameraPermissions = cam.useCameraPermissions;
+}
+
+// ── Selector de estaciones (web) ─────────────────────────────
+function StationPicker({ onSelect }) {
+  const [estaciones, setEstaciones] = React.useState(null); // null = cargando
+
+  React.useEffect(() => {
+    get(ref(db, "estaciones")).then(snap => {
+      if (!snap.exists()) { setEstaciones([]); return; }
+      const lista = Object.entries(snap.val()).map(([id, val]) => ({
+        id,
+        nombre: val.nombre || id,
+      }));
+      setEstaciones(lista);
+    }).catch(() => setEstaciones([]));
+  }, []);
+
+  if (estaciones === null) {
+    return (
+      <View style={ss.pickerLoading}>
+        <ActivityIndicator color={C.green} />
+        <Text style={ss.pickerLoadingTxt}>Buscando dispositivos...</Text>
+      </View>
+    );
+  }
+
+  if (estaciones.length === 0) {
+    return (
+      <ScrollView contentContainerStyle={ss.scrollContent}>
+        <MaterialCommunityIcons name="devices" size={48} color={C.text3} style={ss.stepIcon} />
+        <Text style={ss.stepTitulo}>Sin dispositivos disponibles</Text>
+        <Text style={ss.stepSub}>No encontramos estaciones registradas. Verifica que el dispositivo esté encendido y conectado.</Text>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={ss.scrollContent}>
+      <MaterialCommunityIcons name="access-point" size={48} color={C.green} style={ss.stepIcon} />
+      <Text style={ss.stepTitulo}>Selecciona tu dispositivo</Text>
+      <Text style={ss.stepSub}>
+        {estaciones.length === 1
+          ? "Encontramos 1 dispositivo disponible. Tócalo para vincularlo a tu cuenta."
+          : `Encontramos ${estaciones.length} dispositivos. Toca el tuyo para vincularlo.`}
+      </Text>
+      {estaciones.map(e => (
+        <TouchableOpacity
+          key={e.id}
+          style={ss.stationCard}
+          onPress={() => onSelect(e.id)}
+          activeOpacity={0.8}
+        >
+          <View style={ss.stationCardIco}>
+            <MaterialCommunityIcons name="air-purifier" size={22} color={C.green} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={ss.stationCardNombre}>{e.nombre}</Text>
+            <Text style={ss.stationCardId}>{e.id}</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={C.green} />
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 }
 
 // ── Barra de progreso ─────────────────────────────────────────
@@ -211,6 +275,8 @@ export default function ScreenOnboarding({ uid, nombre }) {
               <Text style={ss.linkBtnTxt}>Ingresar código manualmente</Text>
             </TouchableOpacity>
           </>
+        ) : Platform.OS === "web" ? (
+          <StationPicker onSelect={confirmarCodigo} />
         ) : (
           <ScrollView contentContainerStyle={ss.scrollContent}>
             <MaterialCommunityIcons name="qrcode-scan" size={48} color={C.green} style={ss.stepIcon} />
@@ -218,14 +284,6 @@ export default function ScreenOnboarding({ uid, nombre }) {
             <Text style={ss.stepSub}>
               Encuéntralo en la parte inferior del dispositivo o en la caja.
             </Text>
-            {Platform.OS === "web" && (
-              <View style={ss.webCameraTip}>
-                <Ionicons name="phone-portrait-outline" size={14} color={C.text3} />
-                <Text style={ss.webCameraTipTxt}>
-                  Con la app instalada en tu celular puedes escanear el QR con la cámara
-                </Text>
-              </View>
-            )}
             <TextInput
               style={ss.input}
               value={codigoInput}
@@ -244,11 +302,9 @@ export default function ScreenOnboarding({ uid, nombre }) {
               <Text style={ss.btnPrimTxt}>Continuar</Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </TouchableOpacity>
-            {Platform.OS !== "web" && (
-              <TouchableOpacity onPress={() => setCodigoManual(false)} style={ss.linkBtn}>
-                <Text style={ss.linkBtnTxt}>Volver a la cámara</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => setCodigoManual(false)} style={ss.linkBtn}>
+              <Text style={ss.linkBtnTxt}>Volver a la cámara</Text>
+            </TouchableOpacity>
           </ScrollView>
         )}
       </View>
@@ -463,8 +519,19 @@ const ss = StyleSheet.create({
   cameraBtn:    { backgroundColor: C.green, paddingHorizontal: 24, paddingVertical: 12,
                   borderRadius: 12 },
   cameraBtnTxt: { fontFamily: "Outfit_700Bold", fontSize: 14, color: "#fff" },
-  webCameraTip: { flexDirection: "row", alignItems: "center", gap: 8,
-                  backgroundColor: C.bg2, borderRadius: 10, padding: 12, marginBottom: 16 },
-  webCameraTipTxt: { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.text3,
-                     flex: 1, lineHeight: 18 },
+  // StationPicker
+  pickerLoading:    { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  pickerLoadingTxt: { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text3 },
+  stationCard:      { flexDirection: "row", alignItems: "center",
+                      backgroundColor: C.card, borderRadius: 16,
+                      padding: 16, marginBottom: 12,
+                      borderWidth: 1.5, borderColor: C.green,
+                      shadowColor: C.greenD, shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 },
+  stationCardIco:   { width: 44, height: 44, borderRadius: 12,
+                      backgroundColor: C.bg2, alignItems: "center",
+                      justifyContent: "center", marginRight: 14 },
+  stationCardNombre:{ fontFamily: "Outfit_600SemiBold", fontSize: 15, color: C.text },
+  stationCardId:    { fontFamily: "JetBrainsMono_400Regular", fontSize: 10,
+                      color: C.text3, marginTop: 2 },
 });
