@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, TouchableOpacity, Text, StyleSheet,
-  StatusBar, Image, Animated,
+  StatusBar, Image, Animated, Platform,
 } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -141,7 +141,8 @@ export default function App() {
   const { user, perfil, loading: authLoading } = useAuth();
 
   const [timedOut,    setTimedOut]    = useState(false);
-  const [splashDone,  setSplashDone]  = useState(false);
+  // Web tiene su propio splash en HTML (inject-web.js) — no mostrar el de React
+  const [splashDone,  setSplashDone]  = useState(Platform.OS === "web");
 
   useEffect(() => {
     const t = setTimeout(() => setTimedOut(true), 2500);
