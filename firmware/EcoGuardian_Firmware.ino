@@ -239,10 +239,10 @@ void setup() {
   // WiFi: intenta redes conocidas primero, luego abre portal si ninguna conecta
   Serial.println("[3/4] Conectando WiFi...");
 
-  // Redes que el dispositivo ya conoce — agrega las tuyas aquí
-  const char* SSIDS[] =  { "RedHumberto" };
-  const char* PASSWDS[] = { "12345678"   };
-  const int   N_REDES   = 1;
+  // Agrega aquí las redes conocidas antes de flashear
+  const char* SSIDS[]   = {};
+  const char* PASSWDS[] = {};
+  const int   N_REDES   = 0;
 
   bool conectado = false;
   for (int i = 0; i < N_REDES && !conectado; i++) {

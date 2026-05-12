@@ -11,6 +11,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ref, update, get } from "firebase/database";
 import { db } from "../constants/firebase";
 import { C } from "../constants/colors";
+import ScreenTienda from "./ScreenTienda";
 
 // QR scan solo en nativo; en web se pide código manual
 let CameraView = null;
@@ -144,6 +145,7 @@ function QRScanner({ onScanned }) {
 // ── Pantalla principal ────────────────────────────────────────
 export default function ScreenOnboarding({ uid, nombre }) {
   const [paso,          setPaso]          = useState(0);
+  const [mostrarTienda, setMostrarTienda] = useState(false);
   const [sinDispositivo, setSinDispositivo] = useState(false);
   const [stationId,     setStationId]     = useState("");
   const [codigoManual,  setCodigoManual]  = useState(false);
@@ -155,6 +157,10 @@ export default function ScreenOnboarding({ uid, nombre }) {
   const [saving,        setSaving]        = useState(false);
 
   const nombreDisplay = nombre?.split(" ")[0] || "bienvenido";
+
+  if (mostrarTienda) {
+    return <ScreenTienda onBack={() => setMostrarTienda(false)} />;
+  }
 
   async function finalizar(conDispositivo) {
     setSaving(true);
@@ -213,11 +219,12 @@ export default function ScreenOnboarding({ uid, nombre }) {
         <Progreso paso={0} total={4} />
         <ScrollView contentContainerStyle={ss.scrollContent}>
           <MaterialCommunityIcons name="air-purifier" size={56} color={C.green} style={ss.stepIcon} />
-          <Text style={ss.stepTitulo}>¿Ya tienes tu dispositivo EcoGuardian?</Text>
+          <Text style={ss.stepTitulo}>¿Ya tienes tu EcoG?</Text>
           <Text style={ss.stepSub}>
             Tu kit incluye el sensor de calidad del aire con GPS y conectividad WiFi.
           </Text>
 
+          {/* Opción 1: Ya tengo */}
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.green }]}
             onPress={() => setPaso(2)}
@@ -225,21 +232,36 @@ export default function ScreenOnboarding({ uid, nombre }) {
           >
             <MaterialCommunityIcons name="check-circle-outline" size={24} color={C.green} />
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[ss.opcionTitulo, { color: C.green }]}>Sí, ya tengo mi kit</Text>
-              <Text style={ss.opcionSub}>Escanearé el QR para enlazarlo</Text>
+              <Text style={[ss.opcionTitulo, { color: C.green }]}>Sí, ya lo tengo</Text>
+              <Text style={ss.opcionSub}>Vincular ahora</Text>
             </View>
             <Ionicons name="arrow-forward" size={18} color={C.green} />
           </TouchableOpacity>
 
+          {/* Opción 2: Comprar */}
+          <TouchableOpacity
+            style={[ss.opcionBtn, { borderColor: C.border, marginTop: 12 }]}
+            onPress={() => setMostrarTienda(true)}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="storefront-outline" size={24} color={C.greenD} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[ss.opcionTitulo, { color: C.greenD }]}>Aún no, voy a comprarlo</Text>
+              <Text style={ss.opcionSub}>Ir a la tienda</Text>
+            </View>
+            <Ionicons name="arrow-forward" size={18} color={C.greenD} />
+          </TouchableOpacity>
+
+          {/* Opción 3: Solo explorar */}
           <TouchableOpacity
             style={[ss.opcionBtn, { borderColor: C.border, marginTop: 12 }]}
             onPress={() => { setSinDispositivo(true); setPaso(5); }}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="clock-outline" size={24} color={C.text3} />
+            <MaterialCommunityIcons name="map-search-outline" size={24} color={C.text3} />
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={ss.opcionTitulo}>Aún no tengo uno</Text>
-              <Text style={ss.opcionSub}>Exploraré la red y lo configuro después</Text>
+              <Text style={ss.opcionTitulo}>Solo quiero explorar</Text>
+              <Text style={ss.opcionSub}>Ver la red de la ciudad</Text>
             </View>
             <Ionicons name="arrow-forward" size={18} color={C.text3} />
           </TouchableOpacity>

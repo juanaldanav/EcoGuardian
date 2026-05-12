@@ -17,4 +17,5 @@ export const C = {
   text:   "#1C2B1E",
   text2:  "#4A6B52",
   text3:  "#8FA897",
+  accent: "#7CB342",
 };

@@ -3,10 +3,10 @@
 //   El marcador se mueve cuando el ESP32 manda nuevas coords
 // ============================================================
 import React, { useRef, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Dimensions, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform } from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
 import LiveDot   from "../components/LiveDot";
-import { useStation } from "../hooks/useFirebase";
+import { useStations } from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -32,40 +32,21 @@ const MAP_STYLE = [
 ];
 
 export default function ScreenMapa() {
-  const { data }  = useStation();
-  const mapRef    = useRef(null);
+  const { stations } = useStations();
+  const mapRef       = useRef(null);
+  const [selected, setSelected] = useState(null);
 
-  // Coordenadas reactivas — se actualizan cuando Firebase cambia
-  const [coords, setCoords] = useState({
-    lat: LAT_DEFAULT,
-    lng: LNG_DEFAULT,
-  });
+  const lista = Object.entries(stations);
 
-  const info = getInfo(data?.pm25 || 0);
-
-  // ── Actualiza coords cuando llegan de Firebase ────────────
+  // Selecciona la primera estación por defecto cuando cargan los datos
   useEffect(() => {
-    if (data?.lat && data?.lng && data.lat !== 0 && data.lng !== 0) {
-      const nuevaLat = data.lat;
-      const nuevaLng = data.lng;
-
-      // Actualiza el estado de coordenadas
-      setCoords({ lat: nuevaLat, lng: nuevaLng });
-
-      // Mueve el mapa suavemente a la nueva posición
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            latitude:      nuevaLat,
-            longitude:     nuevaLng,
-            latitudeDelta: 0.008,
-            longitudeDelta:0.008,
-          },
-          1200 // Animación de 1.2 segundos
-        );
-      }
+    if (lista.length > 0 && !selected) {
+      setSelected(lista[0][0]);
     }
-  }, [data?.lat, data?.lng, data?.gps_valido]);
+  }, [lista.length]);
+
+  const data = selected ? stations[selected] : lista[0]?.[1] ?? null;
+  const info = getInfo(data?.pm25 || 0);
 
   return (
     <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false}>
@@ -77,117 +58,139 @@ export default function ScreenMapa() {
           style={ss.map}
           customMapStyle={MAP_STYLE}
           initialRegion={{
-            latitude:      coords.lat,
-            longitude:     coords.lng,
-            latitudeDelta: 0.015,
-            longitudeDelta:0.015,
+            latitude:      data?.lat || LAT_DEFAULT,
+            longitude:     data?.lng || LNG_DEFAULT,
+            latitudeDelta: 0.05,
+            longitudeDelta:0.05,
           }}
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={false}
         >
-          {/* Círculo de área */}
-          <Circle
-            center={{ latitude:coords.lat, longitude:coords.lng }}
-            radius={200}
-            fillColor={info.color + "22"}
-            strokeColor={info.color + "88"}
-            strokeWidth={2}
-          />
-
-          {/* Marcador — usa coords del estado para moverse */}
-          <Marker
-            coordinate={{ latitude:coords.lat, longitude:coords.lng }}
-            title={data?.nombre || "EcoGuardian"}
-            description={`PM2.5: ${(data?.pm25||0).toFixed(1)} µg/m³ — ${info.label}`}
-            tracksViewChanges={true}
-          >
-            <View style={[ss.markerWrap, { shadowColor:info.color }]}>
-              <View style={[ss.markerInner, { backgroundColor:info.color }]}>
-                <MaterialCommunityIcons name="air-filter" size={16} color="#fff" />
-              </View>
-              <View style={[ss.markerTail, { borderTopColor:info.color }]} />
-            </View>
-          </Marker>
+          {lista.map(([id, st]) => {
+            const lat = st?.lat || LAT_DEFAULT;
+            const lng = st?.lng || LNG_DEFAULT;
+            const stInfo = getInfo(st?.pm25 || 0);
+            return (
+              <React.Fragment key={id}>
+                <Circle
+                  center={{ latitude:lat, longitude:lng }}
+                  radius={200}
+                  fillColor={stInfo.color + "22"}
+                  strokeColor={stInfo.color + "88"}
+                  strokeWidth={2}
+                />
+                <Marker
+                  coordinate={{ latitude:lat, longitude:lng }}
+                  title={st?.nombre || id}
+                  description={`PM2.5: ${(st?.pm25||0).toFixed(1)} µg/m³ — ${stInfo.label}`}
+                  tracksViewChanges={false}
+                  onPress={() => setSelected(id)}
+                >
+                  <View style={[ss.markerWrap, { shadowColor:stInfo.color }]}>
+                    <View style={[ss.markerInner,
+                      { backgroundColor: selected === id ? stInfo.color : stInfo.color + "CC" }]}>
+                      <MaterialCommunityIcons name="air-filter" size={16} color="#fff" />
+                    </View>
+                    <View style={[ss.markerTail, { borderTopColor:stInfo.color }]} />
+                  </View>
+                </Marker>
+              </React.Fragment>
+            );
+          })}
         </MapView>
 
-        {/* Badge nivel */}
+        {/* Badge nivel de la estación seleccionada */}
         <View style={[ss.mapBadge, { backgroundColor:info.color+"EE" }]}>
           <Text style={ss.mapBadgeTxt}>{info.label}</Text>
           <Text style={ss.mapBadgeSub}>PM2.5: {(data?.pm25||0).toFixed(1)} µg/m³</Text>
         </View>
 
-        {/* Badge GPS — muestra si es real o por defecto */}
-        <View style={[
-          ss.gpsBadge,
-          { backgroundColor: data?.gps_valido ? C.green+"EE" : "#333333EE" }
-        ]}>
-          <MaterialCommunityIcons
-            name="satellite-variant"
-            size={12}
-            color={data?.gps_valido ? "#fff" : C.text3}
-          />
-          <Text style={[ss.gpsBadgeTxt, { color: data?.gps_valido ? "#fff" : C.text3 }]}>
-            {data?.gps_valido
-              ? `GPS · ${data?.satelites||0} sats`
-              : data?.lat ? "Última posición"
-              : "Sin GPS"
-            }
+        {/* Contador de estaciones */}
+        <View style={[ss.gpsBadge, { backgroundColor: C.greenD + "EE" }]}>
+          <MaterialCommunityIcons name="access-point" size={12} color="#fff" />
+          <Text style={[ss.gpsBadgeTxt, { color: "#fff" }]}>
+            {lista.length} {lista.length === 1 ? "estación" : "estaciones"}
           </Text>
         </View>
       </View>
 
-      {/* ── BOTTOM SHEET ESTACIÓN ───────────────────── */}
-      <View style={ss.bottomSheet}>
-        {/* Cabecera: nombre + nivel pill */}
-        <View style={ss.sheetTop}>
-          <View style={{ flex:1 }}>
-            <Text style={ss.stationName}>{data?.nombre || "Estación 1"}</Text>
-            {data?.lat && data?.lng && data.lat !== 0 && (
-              <Text style={ss.stationCoords}>
-                {data.lat.toFixed(5)} °N · {data.lng.toFixed(5)} °O
-              </Text>
-            )}
-          </View>
-          <View style={[ss.levelPill, { backgroundColor:info.color+"18" }]}>
-            <Text style={[ss.levelPillTxt, { color:info.color }]}>
-              {info.label.toUpperCase()}
-            </Text>
-          </View>
-        </View>
-
-        {/* Aviso GPS sin señal */}
-        {!data?.gps_valido && (
-          <View style={ss.gpsSinSenal}>
-            <MaterialCommunityIcons name="satellite-variant" size={13} color={C.orange} />
-            <Text style={ss.gpsSinSenalTxt}>
-              {data?.lat ? "Última posición conocida" : "GPS buscando señal"}
-            </Text>
-          </View>
-        )}
-
-        {/* Grid de valores */}
-        <View style={ss.valsGrid}>
-          {[
-            { lbl:"PM2.5", val:(data?.pm25||0).toFixed(1), color:info.color },
-            { lbl:"PM10",  val:(data?.pm10||0).toFixed(1), color:C.yellow   },
-            { lbl:"CO₂",  val:Math.round(data?.co2||0),   color:C.text2    },
-          ].map((item, i) => (
-            <View key={i} style={ss.valBox}>
-              <Text style={ss.valLbl}>{item.lbl}</Text>
-              <Text style={[ss.valNum, { color:item.color }]}>{item.val}</Text>
+      {/* ── BOTTOM SHEET ESTACIÓN SELECCIONADA ──────── */}
+      {data && (
+        <View style={ss.bottomSheet}>
+          <View style={ss.sheetTop}>
+            <View style={{ flex:1 }}>
+              <Text style={ss.stationName}>{data?.nombre || selected || "Estación"}</Text>
+              {data?.lat && data?.lng && data.lat !== 0 && (
+                <Text style={ss.stationCoords}>
+                  {data.lat.toFixed(5)} °N · {data.lng.toFixed(5)} °O
+                </Text>
+              )}
             </View>
-          ))}
-        </View>
+            <View style={[ss.levelPill, { backgroundColor:info.color+"18" }]}>
+              <Text style={[ss.levelPillTxt, { color:info.color }]}>
+                {info.label.toUpperCase()}
+              </Text>
+            </View>
+          </View>
 
-        {/* Última actualización */}
-        <View style={ss.sheetFooter}>
-          <LiveDot />
-          <Text style={ss.sheetFooterTxt}>
-            Actualizado hace {timeSince(data?.timestamp) ?? "---"}
-          </Text>
+          {!data?.gps_valido && (
+            <View style={ss.gpsSinSenal}>
+              <MaterialCommunityIcons name="satellite-variant" size={13} color={C.orange} />
+              <Text style={ss.gpsSinSenalTxt}>
+                {data?.lat ? "Última posición conocida" : "GPS buscando señal"}
+              </Text>
+            </View>
+          )}
+
+          <View style={ss.valsGrid}>
+            {[
+              { lbl:"PM2.5", val:(data?.pm25||0).toFixed(1), color:info.color },
+              { lbl:"PM10",  val:(data?.pm10||0).toFixed(1), color:C.yellow   },
+              { lbl:"CO₂",  val:Math.round(data?.co2||0),   color:C.text2    },
+            ].map((item, i) => (
+              <View key={i} style={ss.valBox}>
+                <Text style={ss.valLbl}>{item.lbl}</Text>
+                <Text style={[ss.valNum, { color:item.color }]}>{item.val}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={ss.sheetFooter}>
+            <LiveDot />
+            <Text style={ss.sheetFooterTxt}>
+              Actualizado hace {timeSince(data?.timestamp) ?? "---"}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
+
+      {/* Lista de estaciones si hay más de una */}
+      {lista.length > 1 && (
+        <View style={ss.stationList}>
+          <Text style={ss.stationListTitle}>Red de estaciones</Text>
+          {lista.map(([id, st]) => {
+            const stInfo = getInfo(st?.pm25 || 0);
+            return (
+              <TouchableOpacity
+                key={id}
+                style={[ss.stationItem, selected === id && ss.stationItemActive]}
+                onPress={() => setSelected(id)}
+                activeOpacity={0.75}
+              >
+                <View style={[ss.stationDot, { backgroundColor: stInfo.color }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={ss.stationItemName}>{st?.nombre || id}</Text>
+                  <Text style={ss.stationItemSub}>PM2.5: {(st?.pm25||0).toFixed(1)} µg/m³</Text>
+                </View>
+                <Text style={[ss.stationItemLevel, { color: stInfo.color }]}>
+                  {stInfo.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <View style={{ height:24 }} />
     </ScrollView>
@@ -237,4 +240,17 @@ const ss = StyleSheet.create({
   valNum:        { fontFamily:"JetBrainsMono_400Regular", fontSize:15, fontWeight:"700" },
   sheetFooter:   { flexDirection:"row", alignItems:"center", gap:6 },
   sheetFooterTxt:{ fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3 },
+  stationList:   { marginHorizontal:16, marginBottom:12,
+                   backgroundColor:C.card, borderRadius:18, padding:14,
+                   shadowColor:"#1C2B1E", shadowOffset:{width:0,height:2},
+                   shadowOpacity:.06, shadowRadius:8, elevation:2 },
+  stationListTitle:{ fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text2,
+                     letterSpacing:0.5, marginBottom:10 },
+  stationItem:   { flexDirection:"row", alignItems:"center", gap:10,
+                   paddingVertical:10, paddingHorizontal:4 },
+  stationItemActive:{ backgroundColor:C.bg2, borderRadius:10, paddingHorizontal:8 },
+  stationDot:    { width:8, height:8, borderRadius:4 },
+  stationItemName:{ fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text },
+  stationItemSub: { fontFamily:"JetBrainsMono_400Regular", fontSize:10, color:C.text3, marginTop:1 },
+  stationItemLevel:{ fontFamily:"JetBrainsMono_400Regular", fontSize:10, fontWeight:"700" },
 });

@@ -5,33 +5,51 @@ import { useState, useEffect } from "react";
 import { ref, onValue, query, limitToLast, orderByKey, set, remove, goOnline } from "firebase/database";
 import { db } from "../constants/firebase";
 
-// Hook: datos en tiempo real de la estación
-export function useStation() {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [, setTick]           = useState(0);
+// Hook: todas las estaciones en tiempo real
+export function useStations() {
+  const [stations, setStations] = useState({});
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    // Fuerza conexión al servidor — descarta caché viejos
     goOnline(db);
-
-    const r = ref(db, "estaciones/estacion_01");
+    const r = ref(db, "estaciones");
     const unsub = onValue(r, snap => {
-      // Usa los datos tal como vienen del servidor (timestamp NTP del firmware)
-      // NO sobrescribir con Date.now() — eso hacía parecer datos viejos como "en vivo"
-      setData(snap.val());
+      setStations(snap.val() || {});
       setLoading(false);
     });
     return () => unsub();
   }, []);
 
-  // Re-render cada 30 s para que isDeviceOnline() recalcule sin datos nuevos
+  return { stations, loading };
+}
+
+// Hook: datos en tiempo real de la estación
+export function useStation() {
+  const [data,         setData]         = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [lastReceived, setLastReceived] = useState(null);
+  const [, setTick]                     = useState(0);
+
+  useEffect(() => {
+    goOnline(db);
+    const r = ref(db, "estaciones/estacion_01");
+    const unsub = onValue(r, snap => {
+      const val = snap.val();
+      setData(val);
+      // Registra cuándo llegó este snapshot a la app (no depende de NTP)
+      if (val) setLastReceived(Date.now() / 1000);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Re-render cada 30 s para que isDeviceOnline() recalcule
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 30_000);
     return () => clearInterval(t);
   }, []);
 
-  return { data, loading };
+  return { data, loading, lastReceived };
 }
 
 // Hook: historial de lecturas
