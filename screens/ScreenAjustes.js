@@ -10,6 +10,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
+import { ref as dbRef, update, remove } from "firebase/database";
+import { db } from "../constants/firebase";
 import { useStation, useWifiNetworks } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
@@ -179,6 +181,31 @@ export default function ScreenAjustes() {
     }
   }
 
+  async function resetearDemo() {
+    Alert.alert(
+      "Reiniciar demo",
+      "Esto borrará el onboarding y los dispositivos vinculados de tu cuenta. Tendrás que registrar el dispositivo de nuevo. ¿Continuar?",
+      [
+        { text: "Cancelar" },
+        {
+          text: "Reiniciar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await update(dbRef(db), {
+                [`usuarios/${user.uid}/onboardingCompleto`]: false,
+                [`usuarios/${user.uid}/estaciones`]: null,
+              });
+              logout();
+            } catch (e) {
+              Alert.alert("Error", "No se pudo reiniciar el demo.");
+            }
+          },
+        },
+      ]
+    );
+  }
+
   function handleLogout() {
     if (Platform.OS === "web") {
       logout();
@@ -225,6 +252,15 @@ export default function ScreenAjustes() {
               <Ionicons name="log-out-outline" size={16} color={C.red} />
               <Text style={ss.logoutTxt}>Cerrar sesión</Text>
             </TouchableOpacity>
+            {isAdmin && (
+              <>
+                <View style={ss.div} />
+                <TouchableOpacity onPress={resetearDemo} style={ss.logoutBtn}>
+                  <Ionicons name="refresh-outline" size={16} color={C.orange} />
+                  <Text style={[ss.logoutTxt, { color: C.orange }]}>Reiniciar demo</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -233,7 +269,7 @@ export default function ScreenAjustes() {
               style={ss.input}
               value={loginEmail}
               onChangeText={setLoginEmail}
-              placeholder="juan@ejemplo.com"
+              placeholder="correo@ejemplo.com"
               placeholderTextColor={C.text3}
               autoCapitalize="none"
               keyboardType="email-address"

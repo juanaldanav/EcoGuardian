@@ -120,7 +120,7 @@ export default function ScreenLogin() {
                   style={ss.inputField}
                   value={nombre}
                   onChangeText={t => { setNombre(t); setError(""); }}
-                  placeholder="Juan Aldana"
+                  placeholder="Nombre completo"
                   placeholderTextColor={C.text3}
                   autoCapitalize="words"
                   returnKeyType="next"
@@ -136,7 +136,7 @@ export default function ScreenLogin() {
               style={ss.inputField}
               value={email}
               onChangeText={t => { setEmail(t); setError(""); }}
-              placeholder="juan@ejemplo.com"
+              placeholder="correo@ejemplo.com"
               placeholderTextColor={C.text3}
               autoCapitalize="none"
               keyboardType="email-address"

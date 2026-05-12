@@ -5,7 +5,7 @@
 import React, { useRef, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import LiveDot   from "../components/LiveDot";
-import { useStation } from "../hooks/useFirebase";
+import { useStations } from "../hooks/useFirebase";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -100,7 +100,9 @@ function WebMap({ lat, lng, color }) {
 }
 
 export default function ScreenMapa() {
-  const { data } = useStation();
+  const { stations } = useStations();
+  const lista = Object.entries(stations);
+  const data  = lista[0]?.[1] ?? null;
 
   const lat   = (data?.lat && data.lat !== 0) ? data.lat : LAT_DEFAULT;
   const lng   = (data?.lng && data.lng !== 0) ? data.lng : LNG_DEFAULT;
