@@ -20,6 +20,7 @@
     "historial": {
       ".read": true,
       "$stationId": {
+        ".write": "!newData.exists()",
         "$timestamp": {
           ".write": true,
           "pm25": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000" },
