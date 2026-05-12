@@ -405,7 +405,7 @@ export default function ScreenOnboarding({ uid, nombre }) {
           {/* ── Pasos guiados ────────────────────────────── */}
           <View style={{ gap: 8, marginTop: 20 }}>
             {[
-              { key:"s1", n:1, title:"Enciende tu dispositivo",           sub:"LED VERDE PARPADEANDO"            },
+              { key:"s1", n:1, title:"Enciende tu dispositivo",           sub:"ESPERA ~30 SEGUNDOS"              },
               { key:"s2", n:2, title:"Ve a Ajustes WiFi de tu celular",   sub:"CONÉCTATE A · ECOGUARDIAN-CONFIG", pulse: true },
               { key:"s3", n:3, title:"Vuelve a la app",                   sub:"DETECCIÓN AUTOMÁTICA"             },
             ].map(item => {
