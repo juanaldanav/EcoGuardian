@@ -9,8 +9,8 @@ import { C } from "../constants/colors";
 export default function SensorRow({ icon, label, value, unit, color }) {
   return (
     <View style={ss.row}>
-      <View style={[ss.icon, { backgroundColor: color + "18" }]}>
-        <MaterialCommunityIcons name={icon} size={16} color={color} />
+      <View style={[ss.icon, { backgroundColor: color }]}>
+        <MaterialCommunityIcons name={icon} size={16} color="#fff" />
       </View>
       <Text style={ss.label}>{label}</Text>
       <Text style={[ss.value, { color }]}>{value}</Text>
