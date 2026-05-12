@@ -2,7 +2,7 @@
 //   useFirebase.js — Hooks para leer datos de Firebase
 // ============================================================
 import { useState, useEffect } from "react";
-import { ref, onValue, query, limitToLast, orderByKey, set, remove } from "firebase/database";
+import { ref, onValue, query, limitToLast, orderByKey, set, remove, goOnline } from "firebase/database";
 import { db } from "../constants/firebase";
 
 // Hook: datos en tiempo real de la estación
@@ -12,16 +12,20 @@ export function useStation() {
   const [, setTick]           = useState(0);
 
   useEffect(() => {
+    // Fuerza conexión al servidor — descarta caché viejos
+    goOnline(db);
+
     const r = ref(db, "estaciones/estacion_01");
     const unsub = onValue(r, snap => {
-      setData({ ...snap.val(), receivedAt: Date.now() / 1000 });
+      // Usa los datos tal como vienen del servidor (timestamp NTP del firmware)
+      // NO sobrescribir con Date.now() — eso hacía parecer datos viejos como "en vivo"
+      setData(snap.val());
       setLoading(false);
     });
     return () => unsub();
   }, []);
 
-  // Fuerza re-render cada 30 s para que isDeviceOnline() recalcule
-  // aunque el dispositivo esté apagado y Firebase no mande datos nuevos
+  // Re-render cada 30 s para que isDeviceOnline() recalcule sin datos nuevos
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 30_000);
     return () => clearInterval(t);

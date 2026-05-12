@@ -184,7 +184,7 @@ export default function ScreenMapa() {
         <View style={ss.sheetFooter}>
           <LiveDot />
           <Text style={ss.sheetFooterTxt}>
-            Actualizado hace {timeSince(data?.receivedAt) ?? "---"}
+            Actualizado hace {timeSince(data?.timestamp) ?? "---"}
           </Text>
         </View>
       </View>

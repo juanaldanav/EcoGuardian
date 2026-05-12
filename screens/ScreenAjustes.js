@@ -304,7 +304,7 @@ export default function ScreenAjustes() {
           sub={isDeviceOnline(data) ? "Datos en tiempo real" : "Dispositivo sin conexión"}
           right={
             <Text style={[ss.gris, !isDeviceOnline(data) && { color:C.text3 }]}>
-              {timeSince(data?.receivedAt) ? `hace ${timeSince(data?.receivedAt)}` : "Sin datos"}
+              {timeSince(data?.timestamp) ? `hace ${timeSince(data?.timestamp)}` : "Sin datos"}
             </Text>
           }
         />

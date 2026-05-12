@@ -44,7 +44,7 @@ export default function ScreenAlertas() {
             <View style={ss.bannerMeta}>
               <Text style={ss.bannerMetaTxt}>{data?.nombre || "ESTACIÓN 1"}</Text>
               <Text style={ss.bannerMetaTxt}>{(data.pm25).toFixed(1)} µg/m³</Text>
-              <Text style={ss.bannerMetaTxt}>HACE {timeSince(data?.receivedAt) ?? "---"}</Text>
+              <Text style={ss.bannerMetaTxt}>HACE {timeSince(data?.timestamp) ?? "---"}</Text>
             </View>
           </View>
         )}
@@ -62,7 +62,7 @@ export default function ScreenAlertas() {
             <View style={{ flex:1, marginLeft:14 }}>
               <Text style={[ss.estadoLabel, { color:info.color }]}>{info.label}</Text>
               <Text style={ss.estadoSub}>PM2.5: {(data?.pm25||0).toFixed(1)} µg/m³</Text>
-              <Text style={ss.estadoTs}>Actualizado hace {timeSince(data?.receivedAt) ?? "---"}</Text>
+              <Text style={ss.estadoTs}>Actualizado hace {timeSince(data?.timestamp) ?? "---"}</Text>
             </View>
           </View>
         </View>

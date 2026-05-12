@@ -115,7 +115,7 @@ export default function ScreenDashboard() {
   const [modalVisible, setModalVisible] = useState(false);
 
   const online   = isDeviceOnline(data);
-  const lastSync = timeSince(data?.receivedAt);
+  const lastSync = timeSince(data?.timestamp);
   const pm25     = data?.pm25 || 0;
   const info     = getInfo(pm25);
 
