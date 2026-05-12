@@ -11,7 +11,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
 import { ref as dbRef, update, remove } from "firebase/database";
-import { db } from "../constants/firebase";
+import { db, auth } from "../constants/firebase";
+import { deleteUser } from "firebase/auth";
 import { useStation, useWifiNetworks } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
 import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
@@ -192,13 +193,10 @@ export default function ScreenAjustes() {
           style: "destructive",
           onPress: async () => {
             try {
-              await update(dbRef(db), {
-                [`usuarios/${user.uid}/onboardingCompleto`]: false,
-                [`usuarios/${user.uid}/estaciones`]: null,
-              });
-              logout();
+              await remove(dbRef(db, `usuarios/${user.uid}`));
+              await deleteUser(auth.currentUser);
             } catch (e) {
-              Alert.alert("Error", "No se pudo reiniciar el demo.");
+              Alert.alert("Error", "No se pudo reiniciar el demo. Cierra sesión y vuelve a intentarlo.");
             }
           },
         },
