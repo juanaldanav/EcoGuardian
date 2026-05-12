@@ -6,10 +6,10 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Image, ScrollView, Platform, Alert,
-  Animated, Dimensions,
+  Animated, Dimensions, Linking,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { ref, update, get, onValue } from "firebase/database";
+import { ref, update, onValue } from "firebase/database";
 import { db } from "../constants/firebase";
 import { C } from "../constants/colors";
 import ScreenTienda from "./ScreenTienda";
@@ -175,6 +175,19 @@ export default function ScreenOnboarding({ uid, nombre }) {
   const dot2Y = useRef(new Animated.Value(0)).current;
   const dot3Y = useRef(new Animated.Value(0)).current;
 
+  // Animaciones PairDevice (paso 2)
+  const ring1S = useRef(new Animated.Value(0.6)).current;
+  const ring1O = useRef(new Animated.Value(0.9)).current;
+  const ring2S = useRef(new Animated.Value(0.6)).current;
+  const ring2O = useRef(new Animated.Value(0.9)).current;
+  const ring3S = useRef(new Animated.Value(0.6)).current;
+  const ring3O = useRef(new Animated.Value(0.9)).current;
+  const ledO   = useRef(new Animated.Value(1)).current;
+  const liveP  = useRef(new Animated.Value(1)).current;
+  const [pairSteps,  setPairSteps]  = useState({ s1: "done", s2: "active", s3: "pending" });
+  const [showPicker, setShowPicker] = useState(false);
+  const pairFoundRef = useRef(false);
+
   useEffect(() => {
     const makeFloat = (anim, delay) => {
       Animated.loop(
@@ -189,6 +202,63 @@ export default function ScreenOnboarding({ uid, nombre }) {
     makeFloat(dot2Y, 600);
     makeFloat(dot3Y, 1200);
   }, []);
+
+  // Animaciones PairDevice — arrancan solo en paso 2
+  useEffect(() => {
+    if (paso !== 2) return;
+    pairFoundRef.current = false;
+    setShowPicker(false);
+    setPairSteps({ s1: "done", s2: "active", s3: "pending" });
+
+    const makeRing = (s, o, delay) => {
+      s.setValue(0.6); o.setValue(0.9);
+      const a = Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.parallel([
+            Animated.timing(s, { toValue: 2.2, duration: 2400, useNativeDriver: true }),
+            Animated.timing(o, { toValue: 0,   duration: 2400, useNativeDriver: true }),
+          ]),
+        ])
+      );
+      a.start(); return a;
+    };
+    const r1 = makeRing(ring1S, ring1O, 0);
+    const r2 = makeRing(ring2S, ring2O, 800);
+    const r3 = makeRing(ring3S, ring3O, 1600);
+
+    ledO.setValue(1);
+    const led = Animated.loop(Animated.sequence([
+      Animated.timing(ledO, { toValue: 0.25, duration: 750, useNativeDriver: true }),
+      Animated.timing(ledO, { toValue: 1,    duration: 750, useNativeDriver: true }),
+    ]));
+    led.start();
+
+    liveP.setValue(1);
+    const live = Animated.loop(Animated.sequence([
+      Animated.timing(liveP, { toValue: 1.7, duration: 700, useNativeDriver: true }),
+      Animated.timing(liveP, { toValue: 1,   duration: 700, useNativeDriver: true }),
+    ]));
+    live.start();
+
+    return () => { r1.stop(); r2.stop(); r3.stop(); led.stop(); live.stop(); };
+  }, [paso]);
+
+  // Detección automática de estación vía Firebase — solo en paso 2
+  useEffect(() => {
+    if (paso !== 2) return;
+    const unsub = onValue(ref(db, "estaciones"), snap => {
+      if (!snap.exists() || pairFoundRef.current) return;
+      const ids = Object.keys(snap.val());
+      if (ids.length === 0) return;
+      pairFoundRef.current = true;
+      const found = ids[0];
+      setStationId(found);
+      setPairSteps({ s1: "done", s2: "done", s3: "active" });
+      setTimeout(() => navigateTo(3), 1100);
+    });
+    return () => unsub();
+  }, [paso]);
 
   const nombreDisplay = nombre?.split(" ")[0] || "bienvenido";
 
@@ -236,7 +306,151 @@ export default function ScreenOnboarding({ uid, nombre }) {
     }
   }
 
+  // ── Helpers ───────────────────────────────────────────────
+
+  async function abrirAjustesWifi() {
+    if (Platform.OS === "ios") {
+      const ok = await Linking.canOpenURL("App-Prefs:WIFI");
+      Linking.openURL(ok ? "App-Prefs:WIFI" : "app-settings:");
+    } else if (Platform.OS === "android") {
+      Linking.sendIntent("android.settings.WIFI_SETTINGS").catch(() =>
+        Alert.alert(
+          "Ajustes WiFi",
+          "Abre manualmente la configuración WiFi de tu dispositivo y conéctate a 'EcoGuardian-Config'."
+        )
+      );
+    } else {
+      Alert.alert(
+        "Ajustes WiFi del dispositivo",
+        "1. Abre la configuración WiFi de tu dispositivo.\n2. Conéctate a la red:\n\n   EcoGuardian-Config\n\n3. Se abrirá un portal — elige tu red WiFi e ingresa la contraseña.\n4. Vuelve a la app. La estación aparecerá automáticamente.",
+        [{ text: "Entendido" }]
+      );
+    }
+  }
+
   // ── Renderizadores por paso ────────────────────────────────
+
+  function renderPairDevice() {
+    const STAGE_W = W - 48;
+    const RING    = Math.floor(STAGE_W * 0.6);
+    const BOX     = Math.floor(STAGE_W * 0.38);
+
+    // Modo: picker manual
+    if (showPicker) {
+      return (
+        <View style={ss.root}>
+          <Progreso paso={1} total={4} />
+          <View style={ss.headerRow}>
+            <TouchableOpacity onPress={() => setShowPicker(false)} style={ss.backBtn}>
+              <Ionicons name="arrow-back" size={20} color={C.text2} />
+            </TouchableOpacity>
+            <Text style={ss.headerTitulo}>Seleccionar dispositivo</Text>
+          </View>
+          <StationPicker onSelect={(id) => { setStationId(id); setShowPicker(false); navigateTo(3); }} />
+        </View>
+      );
+    }
+
+    return (
+      <View style={ss.root}>
+        <Progreso paso={1} total={4} />
+        <View style={ss.headerRow}>
+          <TouchableOpacity onPress={() => navigateTo(1, -1)} style={ss.backBtn}>
+            <Ionicons name="arrow-back" size={20} color={C.text2} />
+          </TouchableOpacity>
+          <Text style={ss.headerTitulo}>
+            Conecta tu <Text style={{ color: C.green }}>EcoG</Text>
+          </Text>
+        </View>
+
+        <ScrollView contentContainerStyle={ss.scrollContent} showsVerticalScrollIndicator={false}>
+          <Text style={ss.pairLead}>
+            Sigue los pasos. Tu estación crea una red WiFi temporal para vincularse.
+          </Text>
+
+          {/* ── Stage animado ────────────────────────────── */}
+          <View style={[ss.pairStage, { height: STAGE_W }]}>
+            {/* Anillos concéntricos */}
+            {[
+              { s: ring1S, o: ring1O },
+              { s: ring2S, o: ring2O },
+              { s: ring3S, o: ring3O },
+            ].map((r, i) => (
+              <Animated.View
+                key={i}
+                style={[ss.pairRing, {
+                  width: RING, height: RING, borderRadius: RING / 2,
+                  transform: [{ scale: r.s }],
+                  opacity: r.o,
+                }]}
+              />
+            ))}
+
+            {/* Cubo central */}
+            <View style={[ss.pairBox, { width: BOX, height: BOX }]}>
+              <Image
+                source={require("../assets/ecoguardian-mark.png")}
+                style={{ width: BOX * 0.62, height: BOX * 0.62, resizeMode: "contain" }}
+              />
+              <Animated.View style={[ss.pairLedDot, { opacity: ledO }]} />
+            </View>
+
+            {/* SSID badge */}
+            <View style={ss.ssidBadge}>
+              <Ionicons name="wifi" size={13} color="#7CB342" />
+              <Text style={ss.ssidTxt}>ECOGUARDIAN-CONFIG</Text>
+            </View>
+          </View>
+
+          {/* ── Pasos guiados ────────────────────────────── */}
+          <View style={{ gap: 8, marginTop: 20 }}>
+            {[
+              { key:"s1", n:1, title:"Enciende tu dispositivo",           sub:"LED VERDE PARPADEANDO"            },
+              { key:"s2", n:2, title:"Ve a Ajustes WiFi de tu celular",   sub:"CONÉCTATE A · ECOGUARDIAN-CONFIG", pulse: true },
+              { key:"s3", n:3, title:"Vuelve a la app",                   sub:"DETECCIÓN AUTOMÁTICA"             },
+            ].map(item => {
+              const state = pairSteps[item.key];
+              return (
+                <View key={item.key} style={[ss.pairStep, state === "active" && ss.pairStepActive, state === "done" && ss.pairStepDoneRow]}>
+                  <View style={[ss.pairStepCircle, state === "done" && ss.pairCircleDone, state === "pending" && ss.pairCirclePending]}>
+                    {state === "done"
+                      ? <Ionicons name="checkmark" size={13} color="#fff" />
+                      : <Text style={[ss.pairStepN, state === "pending" && { color: C.text3 }]}>{item.n}</Text>
+                    }
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[ss.pairStepTitle, state === "pending" && { color: C.text3 }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[ss.pairStepSub, state === "active" && { color: "#7CB342" }]}>
+                      {item.sub}
+                    </Text>
+                  </View>
+                  {state === "active" && item.pulse && (
+                    <Animated.View style={[ss.pairLive, {
+                      transform: [{ scale: liveP }],
+                      opacity: liveP.interpolate({ inputRange: [1, 1.7], outputRange: [1, 0.2] }),
+                    }]} />
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={ss.welcomeFoot}>
+          <TouchableOpacity style={ss.btnHero} onPress={abrirAjustesWifi} activeOpacity={0.85}>
+            <Ionicons name="wifi-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={ss.btnHeroTxt}>Abrir Ajustes WiFi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowPicker(true)} style={ss.linkBtn}>
+            <Text style={ss.linkBtnTxt}>¿No aparece la red? Seleccionar manualmente</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   function renderWelcome() {
     return (
@@ -590,7 +804,7 @@ export default function ScreenOnboarding({ uid, nombre }) {
     switch (paso) {
       case 0: return renderWelcome();
       case 1: return renderHasDevice();
-      case 2: return renderScanQR();
+      case 2: return renderPairDevice();
       case 3: return renderStationName();
       case 4: return renderWifi();
       case 5: return renderSuccess();
@@ -678,6 +892,47 @@ const ss = StyleSheet.create({
                       padding: 12, marginBottom: 20 },
   deviceHintTxt:    { fontFamily: "Outfit_400Regular", fontSize: 12, color: C.text3,
                       flex: 1, lineHeight: 18 },
+
+  // ── PairDevice ────────────────────────────────────────────
+  pairLead:        { fontFamily: "Outfit_400Regular", fontSize: 13, color: C.text2,
+                     lineHeight: 20, marginBottom: 18 },
+  pairStage:       { width: "100%", backgroundColor: C.greenD, borderRadius: 20,
+                     alignItems: "center", justifyContent: "center",
+                     overflow: "hidden", position: "relative" },
+  pairRing:        { position: "absolute",
+                     borderWidth: 2, borderColor: "rgba(124,179,66,0.35)" },
+  pairBox:         { backgroundColor: "#2E7D32", borderRadius: 14,
+                     alignItems: "center", justifyContent: "center", zIndex: 2,
+                     shadowColor: "#000", shadowOffset: { width: 0, height: 16 },
+                     shadowOpacity: 0.4, shadowRadius: 30, elevation: 16 },
+  pairLedDot:      { position: "absolute", top: 8, right: 8,
+                     width: 8, height: 8, borderRadius: 4, backgroundColor: "#7CB342",
+                     shadowColor: "#7CB342", shadowOffset: { width: 0, height: 0 },
+                     shadowOpacity: 1, shadowRadius: 5 },
+  ssidBadge:       { position: "absolute", bottom: 14, left: 14, right: 14,
+                     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+                     backgroundColor: "rgba(0,0,0,0.48)", borderRadius: 10,
+                     paddingVertical: 8, paddingHorizontal: 14 },
+  ssidTxt:         { fontFamily: "JetBrainsMono_400Regular", fontSize: 11,
+                     color: "#7CB342", letterSpacing: 1.6 },
+  pairStep:        { flexDirection: "row", alignItems: "center",
+                     backgroundColor: C.card, borderRadius: 12, padding: 14,
+                     gap: 12, borderWidth: 1.5, borderColor: C.border },
+  pairStepActive:  { borderColor: "#7CB342" },
+  pairStepDoneRow: { borderColor: C.green + "55" },
+  pairStepCircle:  { width: 26, height: 26, borderRadius: 13,
+                     backgroundColor: C.green,
+                     alignItems: "center", justifyContent: "center" },
+  pairCircleDone:  { backgroundColor: C.green },
+  pairCirclePending:{ backgroundColor: C.bg2 },
+  pairStepN:       { fontFamily: "JetBrainsMono_400Regular", fontSize: 11,
+                     fontWeight: "700", color: "#fff" },
+  pairStepTitle:   { fontFamily: "Outfit_600SemiBold", fontSize: 13,
+                     color: C.text, marginBottom: 2 },
+  pairStepSub:     { fontFamily: "JetBrainsMono_400Regular", fontSize: 9,
+                     color: C.text3, letterSpacing: 1.5 },
+  pairLive:        { width: 8, height: 8, borderRadius: 4, backgroundColor: "#7CB342" },
+
   stationCard:      { flexDirection: "row", alignItems: "center",
                       backgroundColor: C.card, borderRadius: 16,
                       padding: 16, marginBottom: 12,
