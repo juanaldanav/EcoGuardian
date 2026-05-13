@@ -116,6 +116,7 @@ export function useAlerts() {
     const unsub = onValue(r, snap => {
       const v = snap.val();
       if (v) setAlerts(Object.entries(v).reverse().map(([ts, d]) => ({ ts, ...d })));
+      else   setAlerts([]);
     });
     return () => unsub();
   }, []);

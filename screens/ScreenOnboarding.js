@@ -255,6 +255,7 @@ export default function ScreenOnboarding({ uid, nombre }) {
   // Detección automática — solo estaciones que estén online en este momento
   useEffect(() => {
     if (paso !== 2) return;
+    let navTimer;
     const unsub = onValue(ref(db, "estaciones"), snap => {
       if (!snap.exists() || pairFoundRef.current) return;
       const online = soloOnline(snap.val());
@@ -263,9 +264,9 @@ export default function ScreenOnboarding({ uid, nombre }) {
       const found = online[0][0];
       setStationId(found);
       setPairSteps({ s1: "done", s2: "done", s3: "active" });
-      setTimeout(() => navigateTo(3), 1100);
+      navTimer = setTimeout(() => navigateTo(3), 1100);
     });
-    return () => unsub();
+    return () => { unsub(); clearTimeout(navTimer); };
   }, [paso]);
 
   const nombreDisplay = nombre?.split(" ")[0] || "bienvenido";

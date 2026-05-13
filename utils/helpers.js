@@ -13,9 +13,8 @@ export function getInfo(pm25) {
 }
 
 // true si el dispositivo envió un dato en los últimos 90 segundos.
-// Primero usa el timestamp NTP del firmware (Unix epoch); si NTP falló el
-// firmware manda uptime (< 1e9), así que caemos al lastReceived del hook
-// (Date.now() local de cuando llegó el snapshot a Firebase).
+// Requiere timestamp NTP del firmware (Unix epoch ≥ 1e9).
+// Si el firmware manda uptime (< 1e9) porque NTP no sincronizó, devuelve false.
 export function isDeviceOnline(data) {
   if (!data) return false;
   const { timestamp } = data;
