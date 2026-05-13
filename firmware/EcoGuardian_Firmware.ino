@@ -1,10 +1,12 @@
 /*
  * ============================================================
- *   EcoGuardian Firmware v5.1
+ *   EcoGuardian Firmware v5.2
  *   - WiFiManager: se configura desde el teléfono, sin tocar código
  *   - NTP: timestamp Unix real
  *   - gpsValido se resetea cada ciclo
  *   - tvoc en historial
+ *   - Warm-up CCS811: 3 min tras cada encendido antes de enviar datos
+ *   - GPS: smartDelay + age threshold 5 s para mejor detección
  *
  *   PRIMERA VEZ:
  *     1. Enciende el ESP32
@@ -171,11 +173,19 @@ void leerSDS011() {
   }
 }
 
+// Lee GPS continuamente durante 'ms' milisegundos para maximizar tramas NMEA procesadas
+void smartDelay(unsigned long ms) {
+  unsigned long inicio = millis();
+  do { while (gpsSerial.available()) gps.encode(gpsSerial.read()); }
+  while (millis() - inicio < ms);
+}
+
 void leerGPS() {
   while (gpsSerial.available()) gps.encode(gpsSerial.read());
   gpsValido = false;
   satelites = gps.satellites.isValid() ? gps.satellites.value() : 0;
-  if (gps.location.isValid() && gps.location.age() < 2000) {
+  // Acepta fix de hasta 5 segundos de antigüedad (antes era 2 s — demasiado estricto)
+  if (gps.location.isValid() && gps.location.age() < 5000) {
     lat      = gps.location.lat();
     lng      = gps.location.lng();
     gpsValido = true;
@@ -208,7 +218,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n+==============================+");
-  Serial.println("|   EcoGuardian  v5.1          |");
+  Serial.println("|   EcoGuardian  v5.2          |");
   Serial.println("+==============================+\n");
 
   // Si el botón BOOT está presionado al encender → borra WiFi guardado
@@ -288,12 +298,22 @@ void setup() {
     Serial.println("[4/4] NTP omitido");
   }
 
-  Serial.println("\nCalentando sensores...");
-  for (int i = 10; i > 0; i--) {
-    Serial.printf("%d ", i);
-    delay(1000);
+  // CCS811 necesita ~3 min para estabilizarse tras cada encendido.
+  // Durante este tiempo se leen todos los sensores pero NO se envía a Firebase.
+  Serial.println("\nCalentando CCS811 — 3 min para lecturas estables...");
+  unsigned long tWarmup = millis();
+  while (millis() - tWarmup < 180000) {
+    leerSDS011();
+    leerGPS();
+    leerCCS811();
+    unsigned long restantes = (180000 - (millis() - tWarmup)) / 1000;
+    if (restantes % 15 == 0) {
+      Serial.printf("  %lus restantes | CO2: %.0fppm  TVOC: %.0fppb  PM2.5: %.1f\n",
+                    restantes, co2, tvoc, pm25);
+    }
+    smartDelay(1000);
   }
-  Serial.println("\n! Sistema listo\n");
+  Serial.println("! CCS811 estabilizado — iniciando envios a Firebase\n");
 }
 
 // ── Loop ──────────────────────────────────────────────────────
@@ -308,5 +328,5 @@ void loop() {
     enviarFirebase();
   }
 
-  delay(2000);
+  smartDelay(2000);
 }

@@ -46,6 +46,25 @@ export function detectarInicioSesion(hist) {
   return cronologico[inicioIdx]?.ts || null;
 }
 
+// Nivel de CO2 en ppm (NOM-025-STPS-2008 / ASHRAE 62.1)
+export function getCO2Info(ppm) {
+  const v = ppm || 0;
+  if (v <= 600)  return { label:"Excelente", color:C.green  };
+  if (v <= 1000) return { label:"Bueno",     color:C.yellow };
+  if (v <= 1500) return { label:"Aceptable", color:C.orange };
+  if (v <= 5000) return { label:"Elevado",   color:C.red    };
+  return                { label:"Peligroso", color:C.purple };
+}
+
+// Nivel de TVOC en ppb (WELL Building Standard)
+export function getTVOCInfo(ppb) {
+  const v = ppb || 0;
+  if (v <= 220)  return { label:"Excelente", color:C.green  };
+  if (v <= 660)  return { label:"Bueno",     color:C.yellow };
+  if (v <= 2200) return { label:"Moderado",  color:C.orange };
+  return                { label:"Alto",      color:C.red    };
+}
+
 // Información educativa de cada métrica según normativa mexicana e internacional
 export const METRICAS = {
   pm25: {

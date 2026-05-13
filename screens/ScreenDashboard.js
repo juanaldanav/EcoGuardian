@@ -12,7 +12,7 @@ import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
-import { getInfo, timeSince, isDeviceOnline, METRICAS } from "../utils/helpers";
+import { getInfo, timeSince, isDeviceOnline, METRICAS, getCO2Info, getTVOCInfo } from "../utils/helpers";
 import { C } from "../constants/colors";
 
 // OMS breakpoints para la barra de escala
@@ -321,22 +321,33 @@ export default function ScreenDashboard() {
       )}
 
       {/* ── QUICK 3 TARJETAS ─────────────────────── */}
-      <Animated.View style={[ss.quickRow, { opacity:fadeAnim }]}>
-        {[
-          { icon:"molecule-co2",    label:"CO₂",  val:Math.round(data?.co2||0),  sub:"ppm",                      color:C.green                   },
-          { icon:"chemical-weapon", label:"TVOC",  val:Math.round(data?.tvoc||0), sub:"ppb",                      color:C.yellow                  },
-          { icon:"sync",            label:"Sync",  val:lastSync ?? "---",         sub:`${hist?.length||0} lect`,  color:online ? C.green : C.text3 },
-        ].map((item, i) => (
-          <View key={i} style={ss.quickCard}>
-            <View style={[ss.quickIco, { backgroundColor:item.color }]}>
-              <MaterialCommunityIcons name={item.icon} size={14} color="#fff" />
-            </View>
-            <Text style={[ss.quickVal, { color:C.text }]}>{item.val}</Text>
-            <Text style={ss.quickSub}>{item.sub}</Text>
-            <Text style={ss.quickLabel}>{item.label}</Text>
-          </View>
-        ))}
-      </Animated.View>
+      {(() => {
+        const co2Info  = getCO2Info(data?.co2);
+        const tvocInfo = getTVOCInfo(data?.tvoc);
+        return (
+          <Animated.View style={[ss.quickRow, { opacity:fadeAnim }]}>
+            {[
+              { icon:"molecule-co2",    label:"CO₂",  val:Math.round(data?.co2||0),  sub:"ppm", color:co2Info.color,               nivel:co2Info.label,  key:"co2"  },
+              { icon:"chemical-weapon", label:"TVOC",  val:Math.round(data?.tvoc||0), sub:"ppb", color:tvocInfo.color,              nivel:tvocInfo.label, key:"tvoc" },
+              { icon:"sync",            label:"Sync",  val:lastSync ?? "---",         sub:`${hist?.length||0} lect`, color:online ? C.green : C.text3, nivel:null, key:"sync" },
+            ].map((item) => (
+              <View key={item.key} style={ss.quickCard}>
+                <View style={[ss.quickIco, { backgroundColor:item.color }]}>
+                  <MaterialCommunityIcons name={item.icon} size={14} color="#fff" />
+                </View>
+                <Text style={[ss.quickVal, { color:C.text }]}>{item.val}</Text>
+                <Text style={ss.quickSub}>{item.sub}</Text>
+                {item.nivel && (
+                  <View style={[ss.quickNivel, { backgroundColor: item.color + "18" }]}>
+                    <Text style={[ss.quickNivelTxt, { color: item.color }]}>{item.nivel}</Text>
+                  </View>
+                )}
+                <Text style={ss.quickLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </Animated.View>
+        );
+      })()}
 
       {/* ── MINI GRÁFICA ─────────────────────────── */}
       {chartBars.length >= 3 && (
@@ -470,7 +481,9 @@ const ss = StyleSheet.create({
                        fontWeight:"700", color:C.text },
   quickSub:          { fontFamily:"JetBrainsMono_400Regular", fontSize:8,
                        color:C.text3, letterSpacing:0.5 },
-  quickLabel:        { fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2 },
+  quickNivel:        { paddingHorizontal:6, paddingVertical:2, borderRadius:6, marginTop:3 },
+  quickNivelTxt:     { fontFamily:"Outfit_600SemiBold", fontSize:8, letterSpacing:0.3 },
+  quickLabel:        { fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2, marginTop:2 },
 
   // Trend chart
   trendCard:         { marginHorizontal:14, marginBottom:12, backgroundColor:C.card,
