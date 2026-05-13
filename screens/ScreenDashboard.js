@@ -12,7 +12,7 @@ import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
-import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
+import { getInfo, timeSince, isDeviceOnline, METRICAS } from "../utils/helpers";
 import { C } from "../constants/colors";
 
 // OMS breakpoints para la barra de escala
@@ -23,6 +23,99 @@ const OMS_SCALE = [
   { pct: 32, color: C.red    },
   { pct: 24, color: C.purple },
 ];
+
+const COLOR_MAP = { green: C.green, yellow: C.yellow, orange: C.orange, red: C.red, purple: C.purple };
+
+// ── Modal de información de métrica ──────────────────────────
+function MetricaModal({ metricaKey, valorActual, onClose }) {
+  const m = METRICAS[metricaKey];
+  if (!m) return null;
+
+  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue:1, useNativeDriver:true, tension:90, friction:9 }),
+      Animated.timing(fadeAnim,  { toValue:1, duration:180, useNativeDriver:true }),
+    ]).start();
+  }, []);
+
+  const rangoActual = valorActual != null
+    ? m.rangos.find(r => valorActual >= r.min && (r.max == null || valorActual < r.max))
+    : null;
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <Animated.View style={[ss.modalOverlay, { opacity: fadeAnim }]}>
+          <TouchableWithoutFeedback>
+            <Animated.View style={[ss.modalBox, { transform:[{ scale: scaleAnim }] }]}>
+
+              {/* Header */}
+              <View style={ss.modalHeader}>
+                <View style={[ss.metricaIcoBox, { backgroundColor: C.green + "18" }]}>
+                  <MaterialCommunityIcons name={m.icono} size={20} color={C.green} />
+                </View>
+                <View style={{ flex:1, marginLeft:10 }}>
+                  <Text style={ss.modalTitle}>{m.nombre}</Text>
+                  <Text style={ss.metricaUnidad}>{m.unidad}</Text>
+                </View>
+                <TouchableOpacity onPress={onClose} style={ss.closeBtn}>
+                  <Ionicons name="close" size={18} color={C.text2} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Lectura actual */}
+              {valorActual != null && rangoActual && (
+                <View style={[ss.lecturaActual, { backgroundColor: COLOR_MAP[rangoActual.color] + "12",
+                  borderColor: COLOR_MAP[rangoActual.color] + "30" }]}>
+                  <Text style={[ss.lecturaVal, { color: COLOR_MAP[rangoActual.color] }]}>
+                    {typeof valorActual === "number" && valorActual % 1 !== 0
+                      ? valorActual.toFixed(1) : Math.round(valorActual)} {m.unidad}
+                  </Text>
+                  <Text style={[ss.lecturaLabel, { color: COLOR_MAP[rangoActual.color] }]}>
+                    {rangoActual.label} · {rangoActual.desc}
+                  </Text>
+                </View>
+              )}
+
+              {/* Descripción */}
+              <Text style={ss.metricaDesc}>{m.descripcion}</Text>
+              <Text style={ss.metricaImpacto}>{m.impacto}</Text>
+
+              {/* Norma */}
+              <View style={ss.normaBadge}>
+                <Ionicons name="document-text-outline" size={12} color={C.green} />
+                <Text style={ss.normaTxt}>{m.norma}</Text>
+              </View>
+              <Text style={ss.limiteRef}>Referencia: {m.limiteRef}</Text>
+
+              {/* Tabla de rangos */}
+              <Text style={ss.rangosTitle}>CLASIFICACIÓN DE NIVELES</Text>
+              {m.rangos.map((r, i) => (
+                <View key={i} style={[ss.rangoRow,
+                  rangoActual?.label === r.label && { backgroundColor: COLOR_MAP[r.color] + "10" }]}>
+                  <View style={[ss.rangoDot, { backgroundColor: COLOR_MAP[r.color] }]} />
+                  <View style={{ flex:1 }}>
+                    <Text style={[ss.rangoLabel, rangoActual?.label === r.label && { color: COLOR_MAP[r.color] }]}>
+                      {r.label}
+                    </Text>
+                    <Text style={ss.rangoDesc}>{r.desc}</Text>
+                  </View>
+                  <Text style={ss.rangoRango}>
+                    {r.max != null ? `${r.min}–${r.max}` : `>${r.min}`}
+                  </Text>
+                </View>
+              ))}
+
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </Animated.View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+}
 
 // ── Modal de resumen ──────────────────────────────────────────
 function ResumenModal({ visible, onClose, data, hist }) {
@@ -116,7 +209,8 @@ export default function ScreenDashboard() {
   const stationId         = estacionIds[0] || null;
   const { data, loading } = useStation(stationId);
   const { hist }          = useHistory(stationId);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible,   setModalVisible]   = useState(false);
+  const [metricaModal,   setMetricaModal]   = useState(null); // key de METRICAS
 
   const online   = isDeviceOnline(data);
   const lastSync = timeSince(data?.timestamp);
@@ -273,10 +367,10 @@ export default function ScreenDashboard() {
               <Text style={ss.cardTitle}>Sensores en tiempo real</Text>
               <LiveDot />
             </View>
-            <SensorRow icon="air-purifier"    label="PM2.5" value={data.pm25.toFixed(1)}       unit="µg/m³" color={info.color} />
-            <SensorRow icon="blur"            label="PM10"  value={(data.pm10||0).toFixed(1)}   unit="µg/m³" color={C.yellow}   />
-            <SensorRow icon="molecule-co2"    label="CO₂"   value={Math.round(data.co2||0)}     unit="ppm"   color={C.text2}    />
-            <SensorRow icon="chemical-weapon" label="TVOC"  value={Math.round(data.tvoc||0)}    unit="ppb"   color={C.orange}   />
+            <SensorRow icon="air-purifier"    label="PM2.5" value={data.pm25.toFixed(1)}       unit="µg/m³" color={info.color} onPress={() => setMetricaModal("pm25")} />
+            <SensorRow icon="blur"            label="PM10"  value={(data.pm10||0).toFixed(1)}   unit="µg/m³" color={C.yellow}   onPress={() => setMetricaModal("pm10")} />
+            <SensorRow icon="molecule-co2"    label="CO₂"   value={Math.round(data.co2||0)}     unit="ppm"   color={C.text2}    onPress={() => setMetricaModal("co2")}  />
+            <SensorRow icon="chemical-weapon" label="TVOC"  value={Math.round(data.tvoc||0)}    unit="ppb"   color={C.orange}   onPress={() => setMetricaModal("tvoc")} />
           </Card>
         </Animated.View>
       )}
@@ -305,6 +399,19 @@ export default function ScreenDashboard() {
         data={data}
         hist={hist}
       />
+
+      {metricaModal && (
+        <MetricaModal
+          metricaKey={metricaModal}
+          valorActual={
+            metricaModal === "pm25" ? data?.pm25 :
+            metricaModal === "pm10" ? data?.pm10 :
+            metricaModal === "co2"  ? data?.co2  :
+            metricaModal === "tvoc" ? data?.tvoc  : null
+          }
+          onClose={() => setMetricaModal(null)}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -405,6 +512,30 @@ const ss = StyleSheet.create({
   emptyTitle:        { fontFamily:"Outfit_700Bold", fontSize:18, color:C.text, textAlign:"center" },
   emptyDesc:         { fontFamily:"Outfit_400Regular", fontSize:13, color:C.text2,
                        textAlign:"center", lineHeight:20 },
+  // Modal métrica
+  metricaIcoBox:  { width:40, height:40, borderRadius:12, alignItems:"center", justifyContent:"center" },
+  metricaUnidad:  { fontFamily:"JetBrainsMono_400Regular", fontSize:10, color:C.text3, marginTop:1 },
+  metricaDesc:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text2, lineHeight:18, marginBottom:8 },
+  metricaImpacto: { fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3, lineHeight:17, marginBottom:10 },
+  normaBadge:     { flexDirection:"row", alignItems:"center", gap:5,
+                    backgroundColor:C.green+"12", borderRadius:8,
+                    paddingHorizontal:10, paddingVertical:5, alignSelf:"flex-start", marginBottom:4 },
+  normaTxt:       { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.green, letterSpacing:0.5 },
+  limiteRef:      { fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3, marginBottom:12 },
+  rangosTitle:    { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3,
+                    letterSpacing:2, marginBottom:8 },
+  rangoRow:       { flexDirection:"row", alignItems:"center", gap:10,
+                    paddingVertical:7, paddingHorizontal:6, borderRadius:8, marginBottom:2 },
+  rangoDot:       { width:8, height:8, borderRadius:4, flexShrink:0 },
+  rangoLabel:     { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text },
+  rangoDesc:      { fontFamily:"Outfit_400Regular", fontSize:10, color:C.text3, marginTop:1 },
+  rangoRango:     { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
+  lecturaActual:  { flexDirection:"row", alignItems:"center", justifyContent:"space-between",
+                    padding:12, borderRadius:10, borderWidth:1, marginBottom:12 },
+  lecturaVal:     { fontFamily:"JetBrainsMono_400Regular", fontSize:18, fontWeight:"700" },
+  lecturaLabel:   { fontFamily:"Outfit_400Regular", fontSize:11, flex:1,
+                    textAlign:"right", lineHeight:15 },
+
   // Modal
   modalOverlay:      { flex:1, backgroundColor:"rgba(28,43,30,.55)",
                        justifyContent:"center", alignItems:"center", padding:20 },
