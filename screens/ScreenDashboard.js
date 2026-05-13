@@ -146,7 +146,7 @@ export default function ScreenDashboard() {
   const progress = Math.min(100, (pm25 / 150) * 100);
 
   // Mini bar chart desde historial
-  const chartBars = hist ? hist.slice(-18) : [];
+  const chartBars = hist ? hist.slice(0, 18).reverse() : [];
 
   if (!stationId) {
     return (

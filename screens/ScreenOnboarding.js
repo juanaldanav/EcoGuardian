@@ -26,13 +26,21 @@ if (Platform.OS !== "web") {
 }
 
 // ── Selector de estaciones (web) ─────────────────────────────
+function soloOnline(snapVal) {
+  const ahora = Date.now() / 1000;
+  return Object.entries(snapVal).filter(([, val]) => {
+    const ts = val?.timestamp;
+    return ts && ts > 1_000_000_000 && (ahora - ts) < 90;
+  });
+}
+
 function StationPicker({ onSelect }) {
   const [estaciones, setEstaciones] = React.useState(null);
 
   React.useEffect(() => {
     const unsub = onValue(ref(db, "estaciones"), snap => {
       if (!snap.exists()) { setEstaciones([]); return; }
-      const lista = Object.entries(snap.val()).map(([id, val]) => ({
+      const lista = soloOnline(snap.val()).map(([id, val]) => ({
         id,
         nombre: val.nombre || id,
       }));
@@ -244,15 +252,15 @@ export default function ScreenOnboarding({ uid, nombre }) {
     return () => { r1.stop(); r2.stop(); r3.stop(); led.stop(); live.stop(); };
   }, [paso]);
 
-  // Detección automática de estación vía Firebase — solo en paso 2
+  // Detección automática — solo estaciones que estén online en este momento
   useEffect(() => {
     if (paso !== 2) return;
     const unsub = onValue(ref(db, "estaciones"), snap => {
       if (!snap.exists() || pairFoundRef.current) return;
-      const ids = Object.keys(snap.val());
-      if (ids.length === 0) return;
+      const online = soloOnline(snap.val());
+      if (online.length === 0) return;
       pairFoundRef.current = true;
-      const found = ids[0];
+      const found = online[0][0];
       setStationId(found);
       setPairSteps({ s1: "done", s2: "done", s3: "active" });
       setTimeout(() => navigateTo(3), 1100);

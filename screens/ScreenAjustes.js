@@ -11,11 +11,11 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
-import { ref as dbRef, update } from "firebase/database";
+import { ref as dbRef, update, remove } from "firebase/database";
 import { db } from "../constants/firebase";
-import { useStations } from "../hooks/useFirebase";
+import { useStation, useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
-import { getInfo, timeSince, isDeviceOnline } from "../utils/helpers";
+import { getInfo, fmtTime, isDeviceOnline, detectarInicioSesion } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { F } from "../constants/fonts";
 import ScreenTienda from "./ScreenTienda";
@@ -42,15 +42,17 @@ function Row({ icon, label, sub, right, onPress }) {
 
 // ── Pantalla Ajustes ──────────────────────────────────────────
 export default function ScreenAjustes() {
-  const { stations } = useStations();
   const { user, perfil, isAdmin, login, logout } = useAuth();
 
   // Estaciones vinculadas al usuario
   const estacionIds      = perfil?.estaciones ? Object.keys(perfil.estaciones) : [];
   const tieneDispositivo = estacionIds.length > 0;
   const primeraId        = estacionIds[0] || null;
-  const stationData      = primeraId ? (stations[primeraId] || null) : null;
-  const online           = isDeviceOnline(stationData);
+
+  const { data: stationData } = useStation(primeraId);
+  const { hist }              = useHistory(primeraId);
+  const online                = isDeviceOnline(stationData);
+  const inicioSesion   = detectarInicioSesion(hist);
   // Solo mostrar calidad cuando hay datos reales y el sensor está online
   const hasData          = online && (stationData?.pm25 ?? -1) > 0;
   const info             = hasData ? getInfo(stationData.pm25) : null;
@@ -134,7 +136,7 @@ export default function ScreenAjustes() {
   async function resetearDemo() {
     Alert.alert(
       "Reiniciar demo",
-      "Esto reiniciará el onboarding y desvinculará los dispositivos de tu cuenta. Tu sesión se mantiene. ¿Continuar?",
+      "Se borrarán las mediciones, historial y alertas actuales, y se desvinculará el dispositivo de tu cuenta. ¿Continuar?",
       [
         { text: "Cancelar" },
         {
@@ -142,13 +144,19 @@ export default function ScreenAjustes() {
           style: "destructive",
           onPress: async () => {
             try {
+              // Primero borrar datos del sensor — después navegar
+              await Promise.all([
+                remove(dbRef(db, "estaciones/estacion_01")),
+                remove(dbRef(db, "historial/estacion_01")),
+                remove(dbRef(db, "alertas")),
+              ]);
+              // Esto dispara la navegación al onboarding — va al final
               await update(dbRef(db, `usuarios/${user.uid}`), {
                 onboardingCompleto: false,
                 estaciones:         null,
               });
-              // App.js detecta el cambio en tiempo real y muestra el onboarding
             } catch (e) {
-              Alert.alert("Error", "No se pudo reiniciar. Intenta de nuevo.");
+              Alert.alert("Error", `No se pudo reiniciar: ${e.message}`);
             }
           },
         },
@@ -340,13 +348,24 @@ export default function ScreenAjustes() {
         <Card style={ss.card}>
           <Text style={ss.sectionTitle}>Tu estación</Text>
           <View style={ss.div} />
+          {inicioSesion && (
+            <>
+              <Row
+                icon="power-outline"
+                label="Encendido"
+                sub="Inicio de sesión actual"
+                right={<Text style={ss.verde}>{fmtTime(inicioSesion)}</Text>}
+              />
+              <View style={ss.div} />
+            </>
+          )}
           <Row
-            icon="time-outline"
-            label="Última lectura"
-            sub={online ? "Recibiendo datos en tiempo real" : "Sin conexión reciente"}
+            icon={online ? "time-outline" : "moon-outline"}
+            label={online ? "Última lectura" : "Apagado"}
+            sub={online ? "Recibiendo datos en tiempo real" : "Último dato registrado"}
             right={
               <Text style={[ss.gris, !online && { color: C.text3 }]}>
-                {timeSince(stationData?.timestamp) ? `hace ${timeSince(stationData?.timestamp)}` : "—"}
+                {fmtTime(stationData?.timestamp)}
               </Text>
             }
           />

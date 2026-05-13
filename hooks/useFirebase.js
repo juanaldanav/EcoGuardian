@@ -25,10 +25,9 @@ export function useStations() {
 
 // Hook: datos en tiempo real de la estación
 export function useStation(stationId) {
-  const [data,         setData]         = useState(null);
-  const [loading,      setLoading]      = useState(true);
-  const [lastReceived, setLastReceived] = useState(null);
-  const [, setTick]                     = useState(0);
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [, setTick]           = useState(0);
 
   useEffect(() => {
     if (!stationId) {
@@ -39,9 +38,7 @@ export function useStation(stationId) {
     goOnline(db);
     const r = ref(db, `estaciones/${stationId}`);
     const unsub = onValue(r, snap => {
-      const val = snap.val();
-      setData(val);
-      if (val) setLastReceived(Date.now() / 1000);
+      setData(snap.val());
       setLoading(false);
     });
     return () => unsub();
@@ -53,7 +50,7 @@ export function useStation(stationId) {
     return () => clearInterval(t);
   }, []);
 
-  return { data, loading, lastReceived };
+  return { data, loading };
 }
 
 // Hook: historial de lecturas
