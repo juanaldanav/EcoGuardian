@@ -138,7 +138,7 @@ export default function App() {
     JetBrainsMono_400Regular,
   });
 
-  const { user, perfil, loading: authLoading } = useAuth();
+  const { user, perfil, isAdmin, loading: authLoading } = useAuth();
 
   const [timedOut,    setTimedOut]    = useState(false);
   // Web tiene su propio splash en HTML (inject-web.js) — no mostrar el de React
@@ -172,7 +172,7 @@ export default function App() {
     );
   }
 
-  if (!perfil?.onboardingCompleto) {
+  if (!perfil?.onboardingCompleto && !isAdmin) {
     return (
       <SafeAreaProvider>
         <ScreenOnboarding uid={user.uid} nombre={perfil?.nombre || ""} />

@@ -1,10 +1,16 @@
 export const PRICING = {
-  station: {
-    id:       "ecog-station-v1",
+  suscripcion: {
+    id:       "ecog-plan-mensual",
     name:     "EcoG Station",
-    price:    3500,
+    precio:   599,
     currency: "MXN",
-    inStock:  true,
-    shipping: "2–3 días hábiles",
+    periodo:  "mes",
+    incluye: [
+      "Dispositivo EcoG incluido",
+      "Instalación profesional",
+      "Mantenimiento y soporte técnico",
+      "App EcoGuardian completa",
+      "Alertas según NOM-172-SEMARNAT-2023",
+    ],
   },
 };

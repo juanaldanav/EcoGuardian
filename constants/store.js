@@ -1,14 +1,13 @@
 import { PRICING } from "./pricing";
 
-// Cuando tengas tienda real: cambia null por la URL
+// Cuando tengas contacto/tienda real: cambia null por la URL
 export const STORE_URL = null;
-// export const STORE_URL = "https://tienda.ecoguardian.io/eco-station";
 
-export const STORE_PRODUCT = {
-  id:       PRICING.station.id,
-  name:     PRICING.station.name,
-  price:    PRICING.station.price,
-  currency: PRICING.station.currency,
-  inStock:  PRICING.station.inStock,
-  shipping: PRICING.station.shipping,
+export const STORE_PLAN = {
+  id:       PRICING.suscripcion.id,
+  name:     PRICING.suscripcion.name,
+  precio:   PRICING.suscripcion.precio,
+  currency: PRICING.suscripcion.currency,
+  periodo:  PRICING.suscripcion.periodo,
+  incluye:  PRICING.suscripcion.incluye,
 };

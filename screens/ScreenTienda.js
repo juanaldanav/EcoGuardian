@@ -7,7 +7,7 @@ import {
   ScrollView, Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { STORE_PRODUCT, STORE_URL } from "../constants/store";
+import { STORE_PLAN, STORE_URL } from "../constants/store";
 import { C } from "../constants/colors";
 
 const SPECS = [
@@ -15,17 +15,17 @@ const SPECS = [
   { label: "Aire",        value: "CO₂ / TVOC (CCS811)"     },
   { label: "Ubicación",   value: "GPS integrado (NMEA)"     },
   { label: "Conexión",    value: "WiFi 802.11 b/g/n"        },
-  { label: "Plataforma",  value: "ESP32 + Firebase RT"      },
+  { label: "Alertas",     value: "NOM-172-SEMARNAT-2023"    },
 ];
 
 export default function ScreenTienda({ onBack }) {
-  function handleComprar() {
+  function handleSolicitar() {
     if (STORE_URL) {
-      // Cuando STORE_URL esté activo se puede abrir con Linking
+      // Abrir URL de contacto cuando esté disponible
     } else {
       Alert.alert(
-        "Tienda próximamente",
-        "Pronto podrás adquirir tu EcoG Station en línea. Por ahora contáctanos directamente."
+        "Solicitar EcoG Station",
+        "Escríbenos para agendar tu instalación. Próximamente podrás hacerlo directo desde la app."
       );
     }
   }
@@ -37,7 +37,7 @@ export default function ScreenTienda({ onBack }) {
         <TouchableOpacity style={ss.backBtn} onPress={onBack}>
           <Ionicons name="arrow-back" size={20} color="#fff" />
         </TouchableOpacity>
-        <Text style={ss.heroTitle}>Tienda · EcoGuardian</Text>
+        <Text style={ss.heroTitle}>EcoGuardian · Plan mensual</Text>
 
         {/* Representación visual del dispositivo */}
         <View style={ss.deviceBox}>
@@ -55,27 +55,32 @@ export default function ScreenTienda({ onBack }) {
 
       <ScrollView contentContainerStyle={ss.body} showsVerticalScrollIndicator={false}>
         {/* Nombre y precio */}
-        <Text style={ss.productName}>{STORE_PRODUCT.name}</Text>
+        <Text style={ss.productName}>{STORE_PLAN.name}</Text>
         <View style={ss.priceRow}>
           <Text style={ss.price}>
-            ${STORE_PRODUCT.price.toLocaleString("es-MX")}
+            ${STORE_PLAN.precio.toLocaleString("es-MX")}
           </Text>
           <View style={ss.currencyChip}>
             <Text style={ss.currencyTxt}>
-              {STORE_PRODUCT.currency} · IVA incluido
+              {STORE_PLAN.currency} / {STORE_PLAN.periodo}
             </Text>
           </View>
         </View>
+        <View style={ss.stockRow}>
+          <View style={ss.stockDot} />
+          <Text style={ss.stockTxt}>Dispositivo, instalación y soporte incluidos</Text>
+        </View>
 
-        {/* Stock */}
-        {STORE_PRODUCT.inStock && (
-          <View style={ss.stockRow}>
-            <View style={ss.stockDot} />
-            <Text style={ss.stockTxt}>
-              En existencia · Envío en {STORE_PRODUCT.shipping}
-            </Text>
-          </View>
-        )}
+        {/* Qué incluye */}
+        <Text style={ss.descLabel}>¿Qué incluye?</Text>
+        <View style={ss.specsCard}>
+          {STORE_PLAN.incluye.map((item, i) => (
+            <View key={i} style={[ss.specRow, i < STORE_PLAN.incluye.length - 1 && ss.specBorder]}>
+              <Ionicons name="checkmark-circle" size={16} color={C.accent} style={{ marginRight: 10 }} />
+              <Text style={[ss.specValue, { marginLeft: 0 }]}>{item}</Text>
+            </View>
+          ))}
+        </View>
 
         {/* Descripción */}
         <Text style={ss.descLabel}>¿Qué mide?</Text>
@@ -101,13 +106,13 @@ export default function ScreenTienda({ onBack }) {
 
       {/* Footer fijo */}
       <View style={ss.footer}>
-        <TouchableOpacity style={ss.btnPrim} onPress={handleComprar} activeOpacity={0.85}>
+        <TouchableOpacity style={ss.btnPrim} onPress={handleSolicitar} activeOpacity={0.85}>
           <Text style={ss.btnPrimTxt}>
-            Comprar · ${STORE_PRODUCT.price.toLocaleString("es-MX")}
+            Solicitar · ${STORE_PLAN.precio.toLocaleString("es-MX")}/{STORE_PLAN.periodo}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity style={ss.btnGhost} onPress={onBack} activeOpacity={0.8}>
-          <Text style={ss.btnGhostTxt}>Volver al registro</Text>
+          <Text style={ss.btnGhostTxt}>Volver</Text>
         </TouchableOpacity>
       </View>
     </View>

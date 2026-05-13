@@ -544,8 +544,8 @@ export default function ScreenOnboarding({ uid, nombre }) {
           >
             <MaterialCommunityIcons name="storefront-outline" size={24} color={C.greenD} />
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[ss.opcionTitulo, { color: C.greenD }]}>Aún no, voy a comprarlo</Text>
-              <Text style={ss.opcionSub}>Ir a la tienda</Text>
+              <Text style={[ss.opcionTitulo, { color: C.greenD }]}>Solicitar mi EcoG</Text>
+              <Text style={ss.opcionSub}>Ver plan de suscripción</Text>
             </View>
             <Ionicons name="arrow-forward" size={18} color={C.greenD} />
           </TouchableOpacity>
