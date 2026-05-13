@@ -31,13 +31,15 @@ function MetricaModal({ metricaKey, valorActual, onClose }) {
   const m = METRICAS[metricaKey];
   if (!m) return null;
 
-  const scaleAnim = useRef(new Animated.Value(0.88)).current;
+  const scaleAnim = useRef(new Animated.Value(0.72)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(32)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue:1, useNativeDriver:true, tension:90, friction:9 }),
-      Animated.timing(fadeAnim,  { toValue:1, duration:180, useNativeDriver:true }),
+      Animated.spring(scaleAnim,  { toValue:1, useNativeDriver:true, tension:160, friction:7 }),
+      Animated.spring(slideAnim,  { toValue:0, useNativeDriver:true, tension:160, friction:7 }),
+      Animated.timing(fadeAnim,   { toValue:1, duration:140, useNativeDriver:true }),
     ]).start();
   }, []);
 
@@ -50,12 +52,16 @@ function MetricaModal({ metricaKey, valorActual, onClose }) {
       <TouchableWithoutFeedback onPress={onClose}>
         <Animated.View style={[ss.modalOverlay, { opacity: fadeAnim }]}>
           <TouchableWithoutFeedback>
-            <Animated.View style={[ss.modalBox, { transform:[{ scale: scaleAnim }] }]}>
+            <Animated.View style={[ss.modalBox, {
+                transform:[{ scale: scaleAnim }, { translateY: slideAnim }]
+              }]}>
 
               {/* Header */}
               <View style={ss.modalHeader}>
-                <View style={[ss.metricaIcoBox, { backgroundColor: C.green + "18" }]}>
-                  <MaterialCommunityIcons name={m.icono} size={20} color={C.green} />
+                <View style={[ss.metricaIcoBox, {
+                  backgroundColor: rangoActual ? COLOR_MAP[rangoActual.color] : C.green
+                }]}>
+                  <MaterialCommunityIcons name={m.icono} size={20} color="#fff" />
                 </View>
                 <View style={{ flex:1, marginLeft:10 }}>
                   <Text style={ss.modalTitle}>{m.nombre}</Text>
@@ -66,15 +72,14 @@ function MetricaModal({ metricaKey, valorActual, onClose }) {
                 </TouchableOpacity>
               </View>
 
-              {/* Lectura actual */}
+              {/* Lectura actual — fondo sólido */}
               {valorActual != null && rangoActual && (
-                <View style={[ss.lecturaActual, { backgroundColor: COLOR_MAP[rangoActual.color] + "12",
-                  borderColor: COLOR_MAP[rangoActual.color] + "30" }]}>
-                  <Text style={[ss.lecturaVal, { color: COLOR_MAP[rangoActual.color] }]}>
+                <View style={[ss.lecturaActual, { backgroundColor: COLOR_MAP[rangoActual.color] }]}>
+                  <Text style={ss.lecturaVal}>
                     {typeof valorActual === "number" && valorActual % 1 !== 0
                       ? valorActual.toFixed(1) : Math.round(valorActual)} {m.unidad}
                   </Text>
-                  <Text style={[ss.lecturaLabel, { color: COLOR_MAP[rangoActual.color] }]}>
+                  <Text style={ss.lecturaLabel}>
                     {rangoActual.label} · {rangoActual.desc}
                   </Text>
                 </View>
@@ -84,30 +89,37 @@ function MetricaModal({ metricaKey, valorActual, onClose }) {
               <Text style={ss.metricaDesc}>{m.descripcion}</Text>
               <Text style={ss.metricaImpacto}>{m.impacto}</Text>
 
-              {/* Norma */}
+              {/* Norma — fondo sólido */}
               <View style={ss.normaBadge}>
-                <Ionicons name="document-text-outline" size={12} color={C.green} />
+                <Ionicons name="document-text-outline" size={12} color="#fff" />
                 <Text style={ss.normaTxt}>{m.norma}</Text>
               </View>
               <Text style={ss.limiteRef}>Referencia: {m.limiteRef}</Text>
 
               {/* Tabla de rangos */}
               <Text style={ss.rangosTitle}>CLASIFICACIÓN DE NIVELES</Text>
-              {m.rangos.map((r, i) => (
-                <View key={i} style={[ss.rangoRow,
-                  rangoActual?.label === r.label && { backgroundColor: COLOR_MAP[r.color] + "10" }]}>
-                  <View style={[ss.rangoDot, { backgroundColor: COLOR_MAP[r.color] }]} />
-                  <View style={{ flex:1 }}>
-                    <Text style={[ss.rangoLabel, rangoActual?.label === r.label && { color: COLOR_MAP[r.color] }]}>
-                      {r.label}
+              {m.rangos.map((r, i) => {
+                const active = rangoActual?.label === r.label;
+                return (
+                  <View key={i} style={[ss.rangoRow,
+                    active && { backgroundColor: COLOR_MAP[r.color], borderRadius:8 }]}>
+                    <View style={[ss.rangoDot, {
+                      backgroundColor: active ? "#fff" : COLOR_MAP[r.color]
+                    }]} />
+                    <View style={{ flex:1 }}>
+                      <Text style={[ss.rangoLabel, active && { color:"#fff" }]}>
+                        {r.label}
+                      </Text>
+                      <Text style={[ss.rangoDesc, active && { color:"rgba(255,255,255,0.8)" }]}>
+                        {r.desc}
+                      </Text>
+                    </View>
+                    <Text style={[ss.rangoRango, active && { color:"rgba(255,255,255,0.9)" }]}>
+                      {r.max != null ? `${r.min}–${r.max}` : `>${r.min}`}
                     </Text>
-                    <Text style={ss.rangoDesc}>{r.desc}</Text>
                   </View>
-                  <Text style={ss.rangoRango}>
-                    {r.max != null ? `${r.min}–${r.max}` : `>${r.min}`}
-                  </Text>
-                </View>
-              ))}
+                );
+              })}
 
             </Animated.View>
           </TouchableWithoutFeedback>
@@ -531,23 +543,23 @@ const ss = StyleSheet.create({
   metricaDesc:    { fontFamily:"Outfit_400Regular", fontSize:12, color:C.text2, lineHeight:18, marginBottom:8 },
   metricaImpacto: { fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3, lineHeight:17, marginBottom:10 },
   normaBadge:     { flexDirection:"row", alignItems:"center", gap:5,
-                    backgroundColor:C.green+"12", borderRadius:8,
+                    backgroundColor:C.green, borderRadius:8,
                     paddingHorizontal:10, paddingVertical:5, alignSelf:"flex-start", marginBottom:4 },
-  normaTxt:       { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.green, letterSpacing:0.5 },
+  normaTxt:       { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:"#fff", letterSpacing:0.5 },
   limiteRef:      { fontFamily:"Outfit_400Regular", fontSize:11, color:C.text3, marginBottom:12 },
   rangosTitle:    { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3,
                     letterSpacing:2, marginBottom:8 },
   rangoRow:       { flexDirection:"row", alignItems:"center", gap:10,
-                    paddingVertical:7, paddingHorizontal:6, borderRadius:8, marginBottom:2 },
+                    paddingVertical:7, paddingHorizontal:6, marginBottom:2 },
   rangoDot:       { width:8, height:8, borderRadius:4, flexShrink:0 },
   rangoLabel:     { fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.text },
   rangoDesc:      { fontFamily:"Outfit_400Regular", fontSize:10, color:C.text3, marginTop:1 },
   rangoRango:     { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
   lecturaActual:  { flexDirection:"row", alignItems:"center", justifyContent:"space-between",
-                    padding:12, borderRadius:10, borderWidth:1, marginBottom:12 },
-  lecturaVal:     { fontFamily:"JetBrainsMono_400Regular", fontSize:18, fontWeight:"700" },
+                    padding:14, borderRadius:12, marginBottom:12 },
+  lecturaVal:     { fontFamily:"JetBrainsMono_400Regular", fontSize:20, fontWeight:"700", color:"#fff" },
   lecturaLabel:   { fontFamily:"Outfit_400Regular", fontSize:11, flex:1,
-                    textAlign:"right", lineHeight:15 },
+                    textAlign:"right", lineHeight:15, color:"rgba(255,255,255,0.85)" },
 
   // Modal
   modalOverlay:      { flex:1, backgroundColor:"rgba(28,43,30,.55)",
