@@ -112,15 +112,20 @@ const splashHTML = `
 
 // ── 5. PWA meta tags + registro del Service Worker ──────────────
 const pwaTags = `
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/pwa/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1B5E20">
-  <link rel="apple-touch-icon" href="/assets/pwa/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="EcoGuardian">
   <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(console.error);});}</script>`;
 
 // ── Inyección en el HTML generado por Expo ─────────────────────
+// Reemplaza el favicon.ico de Expo con el ícono EcoGuardian
+html = html.replace(
+  '<link rel="icon" href="/favicon.ico" />',
+  '<link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa/icon-192.png" />'
+);
 html = html.replace("</head>", `${iosZoomFix}${fonts}${splashCSS}${pwaTags}\n</head>`);
 html = html.replace('<div id="root"></div>', `${splashHTML}\n  <div id="root"></div>`);
 
