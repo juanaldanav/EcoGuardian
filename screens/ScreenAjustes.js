@@ -134,32 +134,39 @@ export default function ScreenAjustes() {
   }
 
   async function resetearDemo() {
+    async function ejecutarReset() {
+      try {
+        await Promise.all([
+          remove(dbRef(db, "estaciones/estacion_01")),
+          remove(dbRef(db, "historial/estacion_01")),
+          remove(dbRef(db, "alertas")),
+        ]);
+        await update(dbRef(db, `usuarios/${user.uid}`), {
+          onboardingCompleto: false,
+          estaciones:         null,
+        });
+      } catch (e) {
+        if (Platform.OS === "web") {
+          window.alert(`No se pudo reiniciar: ${e.message}`);
+        } else {
+          Alert.alert("Error", `No se pudo reiniciar: ${e.message}`);
+        }
+      }
+    }
+
+    if (Platform.OS === "web") {
+      if (window.confirm("¿Reiniciar demo? Se borrarán mediciones, historial y alertas, y se desvinculará el dispositivo.")) {
+        await ejecutarReset();
+      }
+      return;
+    }
+
     Alert.alert(
       "Reiniciar demo",
       "Se borrarán las mediciones, historial y alertas actuales, y se desvinculará el dispositivo de tu cuenta. ¿Continuar?",
       [
         { text: "Cancelar" },
-        {
-          text: "Reiniciar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Primero borrar datos del sensor — después navegar
-              await Promise.all([
-                remove(dbRef(db, "estaciones/estacion_01")),
-                remove(dbRef(db, "historial/estacion_01")),
-                remove(dbRef(db, "alertas")),
-              ]);
-              // Esto dispara la navegación al onboarding — va al final
-              await update(dbRef(db, `usuarios/${user.uid}`), {
-                onboardingCompleto: false,
-                estaciones:         null,
-              });
-            } catch (e) {
-              Alert.alert("Error", `No se pudo reiniciar: ${e.message}`);
-            }
-          },
-        },
+        { text: "Reiniciar", style: "destructive", onPress: ejecutarReset },
       ]
     );
   }
