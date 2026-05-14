@@ -67,7 +67,7 @@
       ".read": "auth != null && root.child('usuarios').child(auth.uid).child('rol').val() === 'admin'",
       "$uid": {
         ".read":  "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('rol').val() === 'admin')",
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || root.child('usuarios').child(auth.uid).child('rol').val() === 'admin')",
         "rol": {
           ".validate": "root.child('usuarios').child(auth.uid).child('rol').val() === 'admin' || newData.val() === 'usuario'"
         },
