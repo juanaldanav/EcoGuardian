@@ -1,20 +1,35 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useStations } from "../hooks/useFirebase";
 import { useAuth }     from "../hooks/useAuth";
 
 const StationContext = createContext(null);
 
+function isDefaultFirmwareName(nombre) {
+  return !nombre || /^EcoG [A-F0-9]{6}$/i.test(nombre.trim());
+}
+
 export function StationProvider({ children }) {
-  const { perfil, isAdmin }    = useAuth();
-  const { stations, loading }  = useStations();
+  const { perfil, isAdmin }   = useAuth();
+  const { stations, loading } = useStations();
   const [selectedId, setSelectedId] = useState(null);
 
-  // Admin ve todas; usuario ve solo las suyas
-  const listaIds = isAdmin
-    ? Object.keys(stations)
-    : Object.keys(perfil?.estaciones || {});
+  const listaIds = useMemo(
+    () => isAdmin
+      ? Object.keys(stations).sort()
+      : Object.keys(perfil?.estaciones || {}),
+    [isAdmin, stations, perfil?.estaciones]
+  );
 
-  // Auto-seleccionar la primera disponible
+  // Explorador = onboarding completo pero sin dispositivo adoptado
+  const isExplorer = !isAdmin && listaIds.length === 0 && !!perfil?.onboardingCompleto;
+
+  // Muestra "Estación N" para nombres default del firmware, sino el nombre real
+  function stationLabel(id) {
+    const idx    = listaIds.indexOf(id);
+    const nombre = stations[id]?.nombre || "";
+    return isDefaultFirmwareName(nombre) ? `Estación ${idx + 1}` : nombre;
+  }
+
   useEffect(() => {
     if (listaIds.length > 0 && (!selectedId || !listaIds.includes(selectedId))) {
       setSelectedId(listaIds[0]);
@@ -22,7 +37,11 @@ export function StationProvider({ children }) {
   }, [listaIds.join(",")]);
 
   return (
-    <StationContext.Provider value={{ selectedId, setSelectedId, listaIds, stations, loading }}>
+    <StationContext.Provider value={{
+      selectedId, setSelectedId,
+      listaIds, stations, loading,
+      isExplorer, stationLabel,
+    }}>
       {children}
     </StationContext.Provider>
   );

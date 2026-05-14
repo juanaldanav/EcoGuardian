@@ -214,7 +214,9 @@ export default function ScreenAjustes({ onGoAdmin }) {
               right={
                 <View style={[ss.rolBadge, isAdmin && { backgroundColor: C.green + "22" }]}>
                   <Text style={[ss.rolTxt, { color: isAdmin ? C.green : C.text3 }]}>
-                    {isAdmin ? "Admin" : "Usuario"}
+                    {isAdmin ? "Admin"
+                      : tieneDispositivo ? "Suscriptor"
+                      : "Explorador"}
                   </Text>
                 </View>
               }
@@ -280,8 +282,8 @@ export default function ScreenAjustes({ onGoAdmin }) {
         )}
       </Card>
 
-      {/* ── MI DISPOSITIVO ──────────────────────────── */}
-      <Card style={ss.card}>
+      {/* ── MI DISPOSITIVO — solo para no-admin ─────── */}
+      {!isAdmin && <Card style={ss.card}>
         <Text style={ss.sectionTitle}>Mi dispositivo</Text>
         <View style={ss.div} />
 
@@ -352,7 +354,7 @@ export default function ScreenAjustes({ onGoAdmin }) {
             </TouchableOpacity>
           </View>
         )}
-      </Card>
+      </Card>}
 
       {/* ── ESTADO DE TU ESTACIÓN ───────────────────── */}
       {tieneDispositivo && (
@@ -406,7 +408,8 @@ export default function ScreenAjustes({ onGoAdmin }) {
         </Card>
       )}
 
-      {/* ── PREFERENCIAS ────────────────────────────── */}
+      {/* ── PREFERENCIAS — solo con dispositivo activo ── */}
+      {tieneDispositivo && (
       <Card style={ss.card}>
         <Text style={ss.sectionTitle}>Preferencias</Text>
         <View style={ss.div} />
@@ -416,7 +419,7 @@ export default function ScreenAjustes({ onGoAdmin }) {
           label="Alertas de calidad del aire"
           sub={
             notifAlertas
-              ? "Activo — aviso cuando PM2.5 > 35 µg/m³"
+              ? "Activo — aviso en app cuando PM2.5 > 35 µg/m³"
               : "Desactivado"
           }
           right={
@@ -429,26 +432,23 @@ export default function ScreenAjustes({ onGoAdmin }) {
           }
         />
 
-        {tieneDispositivo && (
-          <>
-            <View style={ss.div} />
-            <Row
-              icon="notifications-outline"
-              label="Probar alerta"
-              sub="Muestra una alerta de prueba ahora"
-              onPress={probarAlerta}
-              right={
-                <View style={ss.probarBtn}>
-                  <Ionicons name="play" size={12} color={C.green} />
-                  <Text style={ss.probarTxt}>Probar</Text>
-                </View>
-              }
-            />
-          </>
-        )}
+        <View style={ss.div} />
+        <Row
+          icon="notifications-outline"
+          label="Probar alerta"
+          sub="Muestra una alerta de prueba ahora"
+          onPress={probarAlerta}
+          right={
+            <View style={ss.probarBtn}>
+              <Ionicons name="play" size={12} color={C.green} />
+              <Text style={ss.probarTxt}>Probar</Text>
+            </View>
+          }
+        />
       </Card>
+      )}
 
-      {notifAlertas && (
+      {notifAlertas && tieneDispositivo && (
         <View style={ss.activoBanner}>
           <Ionicons name="shield-checkmark" size={18} color={C.green} />
           <View style={{ flex:1, marginLeft:10 }}>

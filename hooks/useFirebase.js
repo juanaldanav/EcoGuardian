@@ -129,6 +129,7 @@ export function useAlerts() {
   const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
+    goOnline(db);
     const r = query(ref(db, "alertas"), orderByKey(), limitToLast(20));
     const unsub = onValue(r, snap => {
       const v = snap.val();

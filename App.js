@@ -81,7 +81,7 @@ function AppLayout() {
 
   const renderScreen = () => {
     switch (tab) {
-      case "home":      return <ScreenDashboard />;
+      case "home":      return <ScreenDashboard onGoAlerts={() => handleTabPress("alerts")} />;
       case "map":       return <ScreenMapa />;
       case "community": return <ScreenComunidad />;
       case "alerts":    return <ScreenAlertas />;

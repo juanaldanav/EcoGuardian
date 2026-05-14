@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
 import { ref, onValue, set } from "firebase/database";
@@ -75,5 +76,7 @@ export function useAuth() {
 
   const isAdmin = perfil?.rol === "admin";
 
-  return { user, perfil, isAdmin, loading, login, logout, register };
+  const resetPassword = (email) => sendPasswordResetEmail(auth, email);
+
+  return { user, perfil, isAdmin, loading, login, logout, register, resetPassword };
 }

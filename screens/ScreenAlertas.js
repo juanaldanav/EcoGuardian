@@ -22,12 +22,40 @@ const OMS_LEVELS = [
 const OMS_BAR_COLORS = [C.green, C.yellow, C.orange, C.red, C.purple];
 const OMS_MARKS = ["0", "12", "35", "55", "150", "500"];
 
+function ExplorerGate() {
+  return (
+    <View style={{ flex:1, alignItems:"center", justifyContent:"center", padding:40, gap:14 }}>
+      <View style={{ width:72, height:72, borderRadius:20, backgroundColor:C.bg2,
+                     alignItems:"center", justifyContent:"center" }}>
+        <Ionicons name="lock-closed-outline" size={34} color={C.text3} />
+      </View>
+      <Text style={{ fontFamily:"Outfit_700Bold", fontSize:18, color:C.text, textAlign:"center" }}>
+        Solo para suscriptores
+      </Text>
+      <Text style={{ fontFamily:"Outfit_400Regular", fontSize:13, color:C.text2,
+                     textAlign:"center", lineHeight:20 }}>
+        Las alertas requieren un dispositivo EcoG activo.{"\n"}Ve a Ajustes para adoptar tu estación.
+      </Text>
+      <View style={{ flexDirection:"row", alignItems:"center", gap:8,
+                     backgroundColor:C.green+"12", borderRadius:12,
+                     paddingHorizontal:16, paddingVertical:10 }}>
+        <MaterialCommunityIcons name="check-circle" size={14} color={C.green} />
+        <Text style={{ fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.green }}>
+          Plan EcoG Station · $599 MXN/mes
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function ScreenAlertas() {
-  const { selectedId } = useStationContext();
-  const stationId      = selectedId;
+  const { selectedId, isExplorer } = useStationContext();
+  const stationId = selectedId;
   const { data }       = useStation(stationId);
-  const alerts      = useAlerts();
+  const alerts    = useAlerts();
   const info      = getInfo(data?.pm25 || 0);
+
+  if (isExplorer) return <ExplorerGate />;
   const alarmaActiva = data?.alarma && data?.pm25 > 35;
 
   return (

@@ -14,7 +14,7 @@ import { C } from "../constants/colors";
 const FILAS_INICIALES = 5;
 
 export default function ScreenHistorial() {
-  const { selectedId }    = useStationContext();
+  const { selectedId, isExplorer } = useStationContext();
   const stationId         = selectedId;
   const { hist, loading } = useHistory(stationId);
   const [barSel, setBarSel]       = useState(null);
@@ -24,6 +24,20 @@ export default function ScreenHistorial() {
   const barras = hist.slice(0, 20).reverse();
   const filas  = mostrarTodo ? hist : hist.slice(0, FILAS_INICIALES);
 
+  if (isExplorer) {
+    return (
+      <View style={ss.emptyWrap}>
+        <View style={ss.emptyIcoBox}>
+          <MaterialCommunityIcons name="lock-outline" size={34} color={C.text3} />
+        </View>
+        <Text style={ss.emptyTitle}>Solo para suscriptores</Text>
+        <Text style={[ss.emptyDesc, { textAlign:"center" }]}>
+          El historial requiere un dispositivo EcoG activo.{"\n"}Ve a Ajustes para adoptar tu estación.
+        </Text>
+      </View>
+    );
+  }
+
   if (!stationId) {
     return (
       <View style={ss.emptyWrap}>
@@ -31,9 +45,7 @@ export default function ScreenHistorial() {
           <MaterialCommunityIcons name="chart-timeline-variant-shimmer" size={36} color={C.text3} />
         </View>
         <Text style={ss.emptyTitle}>Sin historial disponible</Text>
-        <Text style={ss.emptyDesc}>
-          Vincula una estación EcoGuardian desde Ajustes para ver el historial de lecturas.
-        </Text>
+        <Text style={ss.emptyDesc}>Conectando con la red...</Text>
       </View>
     );
   }

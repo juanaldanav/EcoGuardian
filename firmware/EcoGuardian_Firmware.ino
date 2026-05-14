@@ -30,8 +30,7 @@
 
 // ── Firebase ─────────────────────────────────────────────────
 #define FIREBASE_URL   "https://ecoguardian-68553-default-rtdb.firebaseio.com"
-#define STATION_ID     "estacion_01"
-#define STATION_NOMBRE "EcoGuardian Estacion 01"
+// stationId y stationNombre se generan en setup() desde la MAC del ESP32
 
 // ── Pin para resetear credenciales WiFi (opcional) ───────────
 // Conecta este pin a GND al encender para olvidar la red guardada
@@ -68,6 +67,8 @@ byte   buf[10];
 int    bufIdx = 0;
 unsigned long ultimoEnvio = 0;
 bool   ntpOk = false;
+String stationId;
+String stationNombre;
 
 // ── Helpers ───────────────────────────────────────────────────
 String calcularNivel(float pm) {
@@ -113,19 +114,19 @@ void enviarFirebase() {
   json += "\"nivel\":\""    + nivel             + "\",";
   json += "\"color\":"      + String(color)     + ",";
   json += "\"alarma\":"     + String(alarma ? "true" : "false") + ",";
-  json += "\"nombre\":\""   + String(STATION_NOMBRE) + "\",";
+  json += "\"nombre\":\""   + stationNombre + "\",";
   json += "\"timestamp\":"  + String(ts);
   json += "}";
 
   HTTPClient http;
-  http.begin(String(FIREBASE_URL) + "/estaciones/" + STATION_ID + ".json");
+  http.begin(String(FIREBASE_URL) + "/estaciones/" + stationId + ".json");
   http.addHeader("Content-Type", "application/json");
   int code = http.PATCH(json);
   Serial.printf("%s Firebase PATCH (HTTP %d)\n", code == 200 ? "OK" : "ERR", code);
   http.end();
 
   // Historial con tvoc y timestamp real como clave
-  String urlHist = String(FIREBASE_URL) + "/historial/" + STATION_ID + "/" + String(ts) + ".json";
+  String urlHist = String(FIREBASE_URL) + "/historial/" + stationId + "/" + String(ts) + ".json";
   String jsonHist = "{";
   jsonHist += "\"pm25\":"  + String(pm25, 1) + ",";
   jsonHist += "\"pm10\":"  + String(pm10, 1) + ",";
@@ -141,7 +142,7 @@ void enviarFirebase() {
   if (alarma) {
     String urlAlerta = String(FIREBASE_URL) + "/alertas/" + String(ts) + ".json";
     String jsonAlerta = "{";
-    jsonAlerta += "\"estacion\":\"" + String(STATION_NOMBRE) + "\",";
+    jsonAlerta += "\"estacion\":\"" + stationNombre + "\",";
     jsonAlerta += "\"pm25\":"  + String(pm25, 1) + ",";
     jsonAlerta += "\"nivel\":\"" + nivel + "\",";
     jsonAlerta += "\"lat\":"   + String(lat, 6) + ",";
@@ -217,8 +218,19 @@ void imprimirSerial() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
+  // Genera ID único desde los últimos 3 bytes de la MAC (antes de cualquier WiFi.begin)
+  WiFi.mode(WIFI_STA);
+  String mac = WiFi.macAddress();   // "AA:BB:CC:DD:EE:FF"
+  mac.replace(":", "");
+  mac.toLowerCase();
+  stationId     = "estacion_" + mac.substring(6);   // "estacion_ddeeff"
+  stationNombre = "EcoG " + mac.substring(6).toUpperCase();  // "EcoG DDEEFF"
+
   Serial.println("\n+==============================+");
   Serial.println("|   EcoGuardian  v5.2          |");
+  Serial.println("+==============================+");
+  Serial.printf( "|  ID: %-24s|\n", stationId.c_str());
   Serial.println("+==============================+\n");
 
   // Si el botón BOOT está presionado al encender → borra WiFi guardado

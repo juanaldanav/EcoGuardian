@@ -27,6 +27,63 @@ const OMS_SCALE = [
 
 const COLOR_MAP = { green: C.green, yellow: C.yellow, orange: C.orange, red: C.red, purple: C.purple };
 
+// ── Gráfica de área (polígono de frecuencias) — SVG web ──────
+function AreaChart({ data }) {
+  if (!data || data.length < 2) return null;
+  const maxVal = Math.max(...data.map(h => h.pm25 || 0), 1);
+  const n = data.length;
+  const H = 60;
+  const pts = data.map((h, i) => [
+    (i / (n - 1)) * 100,
+    H - 4 - (((h.pm25 || 0) / maxVal) * (H - 10)),
+  ]);
+  const lineStr = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const areaStr = `0,${H} ${lineStr} 100,${H}`;
+  const avg     = data.reduce((s, h) => s + (h.pm25 || 0), 0) / n;
+  const col     = getInfo(avg).color;
+  const gradId  = `ag${col.replace(/[^a-z0-9]/gi, "")}`;
+
+  return (
+    <View style={{ height: H, marginTop: 4 }}>
+      <svg viewBox={`0 0 100 ${H}`} preserveAspectRatio="none"
+        style={{ width:"100%", height:H, display:"block" }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={col} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={col} stopOpacity="0.03" />
+          </linearGradient>
+        </defs>
+        <polygon  points={areaStr} fill={`url(#${gradId})`} />
+        <polyline points={lineStr} fill="none" stroke={col}
+          strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+        {pts.map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="2" fill={col} />
+        ))}
+      </svg>
+    </View>
+  );
+}
+
+// ── Pantalla bloqueada para exploradores ─────────────────────
+function ExplorerGate() {
+  return (
+    <View style={ss.gateWrap}>
+      <View style={ss.gateIco}>
+        <MaterialCommunityIcons name="leaf-off" size={34} color={C.text3} />
+      </View>
+      <Text style={ss.gateTitle}>Solo para suscriptores</Text>
+      <Text style={ss.gateDesc}>
+        Este módulo requiere un dispositivo EcoG activo.{"\n"}
+        Ve a Ajustes para adoptar tu estación.
+      </Text>
+      <View style={ss.gateBadge}>
+        <MaterialCommunityIcons name="check-circle" size={14} color={C.green} />
+        <Text style={ss.gateBadgeTxt}>Plan EcoG Station · $599 MXN/mes</Text>
+      </View>
+    </View>
+  );
+}
+
 // ── Modal de información de métrica ──────────────────────────
 function MetricaModal({ metricaKey, valorActual, onClose }) {
   const m = METRICAS[metricaKey];
@@ -216,8 +273,9 @@ function ResumenModal({ visible, onClose, data, hist }) {
 }
 
 // ── Pantalla principal ────────────────────────────────────────
-export default function ScreenDashboard() {
-  const { selectedId, setSelectedId, listaIds, stations } = useStationContext();
+export default function ScreenDashboard({ onGoAlerts }) {
+  const { selectedId, setSelectedId, listaIds, stations,
+          loading: stCtxLoading, isExplorer, stationLabel } = useStationContext();
   const stationId         = selectedId;
   const { data, loading } = useStation(stationId);
   const { hist }          = useHistory(stationId);
@@ -255,16 +313,24 @@ export default function ScreenDashboard() {
   // Mini bar chart desde historial
   const chartBars = hist ? hist.slice(0, 18).reverse() : [];
 
+  if (isExplorer) return <ExplorerGate />;
+
   if (!stationId) {
+    if (stCtxLoading) {
+      return (
+        <View style={ss.emptyWrap}>
+          <ActivityIndicator size="large" color={C.green} />
+          <Text style={ss.emptyDesc}>Conectando con la red...</Text>
+        </View>
+      );
+    }
     return (
       <View style={ss.emptyWrap}>
         <View style={ss.emptyIcoBox}>
           <MaterialCommunityIcons name="access-point-off" size={36} color={C.text3} />
         </View>
-        <Text style={ss.emptyTitle}>Sin dispositivo vinculado</Text>
-        <Text style={ss.emptyDesc}>
-          Ve a Ajustes para vincular tu estación EcoGuardian o explorar los datos de la red.
-        </Text>
+        <Text style={ss.emptyTitle}>Sin datos disponibles</Text>
+        <Text style={ss.emptyDesc}>No hay estaciones activas en la red.</Text>
       </View>
     );
   }
@@ -278,22 +344,26 @@ export default function ScreenDashboard() {
         <View style={ss.heroDeco1} />
         <View style={ss.heroDeco2} />
 
-        {/* Selector de estación — visible cuando hay más de una */}
-        {listaIds.length > 1 && (
-          <TouchableOpacity style={ss.selectorBtn} onPress={() => setDropdownOpen(true)} activeOpacity={0.8}>
-            <Ionicons name="layers-outline" size={13} color="rgba(255,255,255,0.8)" />
-            <Text style={ss.selectorTxt} numberOfLines={1}>
-              {stations[stationId]?.nombre || stationId}
-            </Text>
+        {/* Selector de estación — siempre visible */}
+        <TouchableOpacity
+          style={ss.selectorBtn}
+          onPress={() => listaIds.length > 1 && setDropdownOpen(true)}
+          activeOpacity={listaIds.length > 1 ? 0.8 : 1}
+        >
+          <Ionicons name="layers-outline" size={13} color="rgba(255,255,255,0.8)" />
+          <Text style={ss.selectorTxt} numberOfLines={1}>
+            {stationLabel(stationId)}
+          </Text>
+          {listaIds.length > 1 && (
             <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.8)" />
-          </TouchableOpacity>
-        )}
+          )}
+        </TouchableOpacity>
 
         {/* Live row */}
         <View style={ss.liveRow}>
           <Animated.View style={[ss.liveDot, { transform:[{ scale:pulseAnim }], opacity: online ? 1 : 0.4 }]} />
           <Text style={ss.liveTxt}>
-            {online ? `EN VIVO · ${data?.nombre || stationId}` : "SIN CONEXIÓN"}
+            {online ? `EN VIVO · ${stationLabel(stationId)}` : "SIN CONEXIÓN"}
           </Text>
         </View>
 
@@ -329,7 +399,7 @@ export default function ScreenDashboard() {
             <MaterialCommunityIcons name="chart-bar" size={13} color={C.greenD} />
             <Text style={ss.heroBtnPrimaryTxt}>Analíticas</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={ss.heroBtnGhost} activeOpacity={0.8}>
+          <TouchableOpacity style={ss.heroBtnGhost} onPress={onGoAlerts} activeOpacity={0.8}>
             <Ionicons name="notifications-outline" size={13} color="#fff" />
             <Text style={ss.heroBtnGhostTxt}>Alertas</Text>
           </TouchableOpacity>
@@ -373,24 +443,14 @@ export default function ScreenDashboard() {
         );
       })()}
 
-      {/* ── MINI GRÁFICA ─────────────────────────── */}
+      {/* ── GRÁFICA DE TENDENCIA ─────────────────── */}
       {chartBars.length >= 3 && (
         <Animated.View style={[ss.trendCard, { opacity:fadeAnim }]}>
           <View style={ss.trendHeader}>
             <Text style={ss.trendTtl}>Tendencia reciente</Text>
             <View style={ss.trendPill}><Text style={ss.trendPillTxt}>PM2.5 µg/m³</Text></View>
           </View>
-          <View style={ss.trendBars}>
-            {chartBars.map((h, i) => {
-              const hi = getInfo(h.pm25 || 0);
-              const barH = Math.max(4, Math.min(44, ((h.pm25||0) / 60) * 44));
-              return (
-                <View key={i} style={ss.trendBarWrap}>
-                  <View style={[ss.trendBar, { height:barH, backgroundColor:hi.color + "CC" }]} />
-                </View>
-              );
-            })}
-          </View>
+          <AreaChart data={chartBars} />
         </Animated.View>
       )}
 
@@ -655,4 +715,17 @@ const ss = StyleSheet.create({
   dropItemName:      { fontFamily:"Outfit_600SemiBold", fontSize:14, color:C.text },
   dropItemId:        { fontFamily:"JetBrainsMono_400Regular", fontSize:10,
                        color:C.text3, marginTop:2 },
+
+  // Explorer gate
+  gateWrap:    { flex:1, alignItems:"center", justifyContent:"center",
+                 padding:40, gap:14 },
+  gateIco:     { width:72, height:72, borderRadius:20, backgroundColor:C.bg2,
+                 alignItems:"center", justifyContent:"center" },
+  gateTitle:   { fontFamily:"Outfit_700Bold", fontSize:18, color:C.text, textAlign:"center" },
+  gateDesc:    { fontFamily:"Outfit_400Regular", fontSize:13, color:C.text2,
+                 textAlign:"center", lineHeight:20 },
+  gateBadge:   { flexDirection:"row", alignItems:"center", gap:8,
+                 backgroundColor:C.green+"12", borderRadius:12,
+                 paddingHorizontal:16, paddingVertical:10 },
+  gateBadgeTxt:{ fontFamily:"Outfit_600SemiBold", fontSize:12, color:C.green },
 });
