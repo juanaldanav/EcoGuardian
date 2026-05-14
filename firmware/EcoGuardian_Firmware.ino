@@ -27,6 +27,7 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include <WiFiManager.h>          // instalar: "WiFiManager" by tzapu
+#include <esp_system.h>           // esp_efuse_mac_get_default()
 
 // ── Firebase ─────────────────────────────────────────────────
 #define FIREBASE_URL   "https://ecoguardian-68553-default-rtdb.firebaseio.com"
@@ -219,15 +220,19 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // Genera ID único desde los últimos 3 bytes de la MAC (antes de cualquier WiFi.begin)
+  // Genera ID único desde los últimos 3 bytes de la MAC — lee directo del eFuse
+  // (WiFi.macAddress() puede devolver 00:00:00:00:00:00 si el stack aún no inició)
+  uint8_t baseMac[6];
+  esp_efuse_mac_get_default(baseMac);
+  char macHex[13];
+  snprintf(macHex, sizeof(macHex), "%02x%02x%02x%02x%02x%02x",
+           baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+  String macSuffix = String(macHex).substring(6);   // últimos 3 bytes = 6 chars hex
+  String macSuffixUp = macSuffix;
+  macSuffixUp.toUpperCase();
+  stationId     = "estacion_" + macSuffix;           // "estacion_ddeeff"
+  stationNombre = "EcoG " + macSuffixUp;             // "EcoG DDEEFF"
   WiFi.mode(WIFI_STA);
-  String mac = WiFi.macAddress();   // "AA:BB:CC:DD:EE:FF"
-  mac.replace(":", "");
-  mac.toLowerCase();
-  stationId     = "estacion_" + mac.substring(6);   // "estacion_ddeeff"
-  String macSuffix = mac.substring(6);
-  macSuffix.toUpperCase();
-  stationNombre = "EcoG " + macSuffix;               // "EcoG DDEEFF"
 
   Serial.println("\n+==============================+");
   Serial.println("|   EcoGuardian  v5.2          |");
