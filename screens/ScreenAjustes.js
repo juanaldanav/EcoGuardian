@@ -233,6 +233,10 @@ export default function ScreenAjustes({ onGoAdmin }) {
                   <Ionicons name="shield-checkmark-outline" size={16} color={C.green} />
                   <Text style={[ss.logoutTxt, { color: C.green }]}>Panel Admin</Text>
                 </TouchableOpacity>
+                <TouchableOpacity onPress={() => setMostrarTienda(true)} style={ss.logoutBtn}>
+                  <Ionicons name="storefront-outline" size={16} color={C.green} />
+                  <Text style={[ss.logoutTxt, { color: C.green }]}>Ver tienda</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={resetearDemo} style={ss.logoutBtn}>
                   <Ionicons name="refresh-outline" size={16} color={C.orange} />
                   <Text style={[ss.logoutTxt, { color: C.orange }]}>Reiniciar demo</Text>
