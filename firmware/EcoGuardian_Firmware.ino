@@ -225,9 +225,9 @@ void setup() {
   uint64_t efuseMac = ESP.getEfuseMac();
   char macHex[13];
   snprintf(macHex, sizeof(macHex), "%02x%02x%02x%02x%02x%02x",
-    (uint8_t)(efuseMac >> 40), (uint8_t)(efuseMac >> 32),
-    (uint8_t)(efuseMac >> 24), (uint8_t)(efuseMac >> 16),
-    (uint8_t)(efuseMac >> 8),  (uint8_t)(efuseMac));
+    (uint8_t)(efuseMac),        (uint8_t)(efuseMac >> 8),
+    (uint8_t)(efuseMac >> 16),  (uint8_t)(efuseMac >> 24),
+    (uint8_t)(efuseMac >> 32),  (uint8_t)(efuseMac >> 40));
   String macSuffix = String(macHex).substring(6);   // últimos 3 bytes = 6 chars hex
   String macSuffixUp = macSuffix;
   macSuffixUp.toUpperCase();
