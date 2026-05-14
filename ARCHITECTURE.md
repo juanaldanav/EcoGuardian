@@ -1,28 +1,42 @@
-# EcoGuardian — Arquitectura del Proyecto
+# EcoGuardian — Arquitectura (actualizado 13-may-2026)
 
-## Flujo de datos completo
+## Flujo de datos
 
 ```
-ESP32 (Arduino)
+ESP32 (firmware MAC-based)
   ├── SDS011  → pm25, pm10
   ├── CCS811  → co2, tvoc
-  └── GPS     → lat, lng, satelites, gps_valido
+  └── GPS NEO-6M → lat, lng, satelites, gps_valido
 
-  cada 30 s → HTTP PATCH/PUT → Firebase Realtime Database
-                                    ↓
-                              App (React Native / Expo)
-                              useFirebase.js hooks (onValue listener)
-                                    ↓
-                              Screens (re-render automático)
+  cada 30 s → HTTP PUT → Firebase Realtime Database
+                               ↓
+                         StationContext (context/StationContext.js)
+                         selectedId + listaIds + stationLabel()
+                               ↓
+                         Screens (re-render via onValue listener)
 ```
 
 ---
 
-## Estructura de Firebase
+## ID de estación
+
+Cada ESP32 genera su ID en `setup()` desde la MAC:
+```cpp
+String mac = WiFi.macAddress();   // "AA:BB:CC:DD:EE:FF"
+mac.replace(":", ""); mac.toLowerCase();
+stationId     = "estacion_" + mac.substring(6);  // "estacion_ddeeff"
+stationNombre = "EcoG " + mac.substring(6).toUpperCase();  // "EcoG DDEEFF"
+```
+
+La app muestra "Estación 1", "Estación 2"... cuando el nombre coincide con `/^EcoG [A-F0-9]{6}$/i`. Si el admin renombra la estación, muestra el nombre personalizado.
+
+---
+
+## Estructura Firebase
 
 ```
 estaciones/
-  estacion_01/          ← PATCH cada 30 s (estado actual)
+  estacion_{mac6}/       ← PUT cada 30 s
     pm25        float
     pm10        float
     co2         float
@@ -31,102 +45,115 @@ estaciones/
     lng         float
     satelites   int
     gps_valido  bool
-    nivel       string  ("bueno" | "moderado" | "malo" | "muy_malo" | "peligroso")
-    color       int     (0-4) — NO usado por la app, redundante
-    alarma      bool    (pm25 > 35)
-    nombre      string  ("Estacion 1")
-    timestamp   int     ← ⚠️ BUG: es millis()/1000 (uptime), NO Unix epoch
+    nivel       string   ("bueno"|"moderado"|"malo"|"muy_malo"|"peligroso")
+    alarma      bool     (pm25 > 35)
+    nombre      string   ("EcoG DDEEFF" default, editable por admin)
+    timestamp   int      Unix epoch en segundos (NTP via WiFi)
 
 historial/
-  estacion_01/
-    {timestamp}/        ← PUT cada 30 s
+  estacion_{mac6}/
+    {timestamp}/         ← PUT cada 30 s
       pm25    float
       pm10    float
       co2     float
+      tvoc    float
       nivel   string
-      — tvoc NO se guarda aquí (solo en estacion_01)
 
 alertas/
-  {timestamp}/          ← PUT solo cuando pm25 > 35
-    estacion  string
-    pm25      float
-    nivel     string
-    lat       float
-    lng       float
+  {timestamp}/           ← PUT solo cuando pm25 > 35
+    estacionId  string
+    estacion    string   (nombre)
+    pm25        float
+    pm10        float
+    co2         float
+    nivel       string
+    lat         float
+    lng         float
+    ts          int
+
+usuarios/
+  {uid}/
+    nombre              string
+    email               string
+    rol                 "admin" | "usuario"
+    creadoEn            int (epoch)
+    onboardingCompleto  bool
+    estaciones          { estacion_id: true }  ← solo usuarios con dispositivo
+
+configuracion/
+  redes/
+    {id}/  ssid + password  ← WiFi configuradas
 ```
 
 ---
 
-## Hooks — useFirebase.js
-
-| Hook | Path Firebase | Usado en |
-|---|---|---|
-| `useStation()` | `estaciones/estacion_01` | Dashboard, Mapa, Alertas, Ajustes |
-| `useHistory()` | `historial/estacion_01` (últimas 30) | Dashboard (modal promedios), Historial |
-| `useAlerts()` | `alertas` (últimas 20) | Alertas |
-
-Todos usan `onValue` (listener en tiempo real). `useStation` y `useHistory` exponen `{ data/hist, loading }`. `useAlerts` solo expone el array (sin loading).
-
----
-
-## Mapa de pantallas
-
-### App.js
-- Controla `tab` (navegación) y `darkMode` (state local)
-- `darkMode` solo cambia el `bgColor` del contenedor raíz
-- Pasa `darkMode` + `setDarkMode` únicamente a `ScreenAjustes`
+## Roles y flujo de app
 
 ```
 App.js
-  └── AppLayout
-        ├── Header (título fijo "EcoGuardian")
-        ├── renderScreen() según tab activo
-        │     ├── ScreenDashboard  — sin props
-        │     ├── ScreenMapa       — sin props
-        │     ├── ScreenAlertas    — sin props
-        │     ├── ScreenHistorial  — sin props
-        │     └── ScreenAjustes    — { darkMode, setDarkMode }
-        └── BottomNav (TABS array)
+  ├── !fontsReady || authLoading  → blank screen
+  ├── !splashDone                 → ScreenSplash
+  ├── !user                       → ScreenLogin (login / registro / olvidé)
+  ├── !onboardingCompleto && !isAdmin → ScreenOnboarding
+  └── AppLayout (StationProvider wrapping)
+        ├── tab "home"      → ScreenDashboard  (onGoAlerts prop)
+        ├── tab "map"       → ScreenMapa
+        ├── tab "community" → ScreenComunidad
+        ├── tab "alerts"    → ScreenAlertas    (ExplorerGate si isExplorer)
+        ├── tab "history"   → ScreenHistorial  (ExplorerGate si isExplorer)
+        ├── tab "admin"     → ScreenAdmin      (no en TABS, solo via settings)
+        └── tab "settings"  → ScreenAjustes   (onGoAdmin prop)
 ```
 
-### ScreenDashboard
-- `useStation()` → datos en tiempo real (pm25, co2, tvoc, gps, timestamp, alarma)
-- `useHistory()` → últimas 30 lecturas para promedios del modal
-- `getInfo(pm25)` → color/label/emoji del nivel actual
-- Modal `ResumenModal` calcula promedios de hist (pm25, pm10, co2)
-- Banner de alerta local: se muestra si `data.alarma === true`
-
-### ScreenMapa
-- `useStation()` → coordenadas GPS + datos de calidad
-- Fallback coords: Culiacán centro (24.7931, -107.3939) si GPS sin señal
-- `mapRef.animateToRegion()` cuando cambian lat/lng en Firebase
-- Requiere `react-native-maps` con Google Maps API key en producción
-
-### ScreenAlertas
-- `useStation()` → estado actual (muestra nivel en tiempo real)
-- `useAlerts()` → historial de alertas de Firebase
-- Escala OMS hardcoded en el JSX (5 niveles)
-
-### ScreenHistorial
-- `useHistory()` → últimas 30 lecturas
-- Gráfica de barras manual (sin librería externa)
-- `fmtTime(ts)` convierte la key de Firebase (timestamp string) a hora legible
-
-### ScreenAjustes
-- `useStation()` → muestra nivel actual y última actualización
-- `notifAlertas`: estado LOCAL — se pierde al navegar fuera y volver
-- Alerta nativa (`Alert.alert`) cuando `data.alarma` cambia a `true`
-- Modo oscuro: el Switch funciona pero solo cambia `bgColor` del root en App.js
+| Rol | Ve | No ve |
+|---|---|---|
+| admin | Todas las estaciones, ScreenAdmin, tienda | "Vincular dispositivo", switch alertas |
+| suscriptor | Su(s) estación(es), todas las screens | ScreenAdmin |
+| explorador | Mapa, Comunidad | Dashboard, Alertas, Historial (ExplorerGate) |
 
 ---
 
-## Utilidades — helpers.js
+## Hooks — hooks/useFirebase.js
 
-### getInfo(pm25)
-Devuelve `{ label, color, bg, emoji, score }` según umbral PM2.5.
-`score` nunca se usa en ninguna pantalla actualmente.
+| Hook | Path Firebase | Quién lo usa |
+|---|---|---|
+| `useStations()` | `estaciones/` (todas) | StationContext (admin), ScreenAdmin |
+| `useStation(id)` | `estaciones/{id}` | ScreenDashboard, ScreenMapa |
+| `useHistory(id)` | `historial/{id}` (últimas 30) | ScreenDashboard, ScreenHistorial |
+| `useAlerts()` | `alertas/` (últimas 20) | ScreenAlertas |
+| `useAllUsers()` | `usuarios/` | ScreenAdmin |
+| `useWifiNetworks()` | `configuracion/redes/` | ScreenAjustes |
 
-| Rango | Label | Color |
+Todos usan `onValue` (tiempo real). `goOnline(db)` al inicio de cada efecto para forzar reconexión.
+
+---
+
+## StationContext — context/StationContext.js
+
+Provee a toda la app:
+- `selectedId` / `setSelectedId` — estación activa
+- `listaIds` — admin: todas; suscriptor: `perfil.estaciones`
+- `stations` — snapshot completo de todas las estaciones
+- `isExplorer` — onboardingCompleto pero sin dispositivos
+- `stationLabel(id)` — "Estación N" o nombre personalizado
+
+---
+
+## Componentes compartidos — components/
+
+| Componente | Props | Usado en |
+|---|---|---|
+| `Card` | `children, style` | Dashboard, Alertas, Historial, Ajustes |
+| `SensorRow` | `icon, label, value, unit, color` | Dashboard, Mapa |
+
+---
+
+## Utilidades — utils/helpers.js
+
+### `getInfo(pm25)`
+Devuelve `{ label, color, bg, emoji }` según umbral PM2.5 (escala NOM-172).
+
+| Rango µg/m³ | Label | Color |
 |---|---|---|
 | ≤ 12 | Bueno | C.green |
 | ≤ 35 | Moderado | C.yellow |
@@ -134,78 +161,19 @@ Devuelve `{ label, color, bg, emoji, score }` según umbral PM2.5.
 | ≤ 150 | Muy malo | C.red |
 | > 150 | Peligroso | C.purple |
 
-### timeSince(ts)
-Calcula minutos transcurridos: `(Date.now()/1000 - ts) / 60`
-⚠️ **BUG**: asume `ts` es Unix epoch en segundos, pero el Arduino envía `millis()/1000` (uptime desde arranque). Resultado: siempre muestra un tiempo incorrecto enorme.
+### `isDeviceOnline(ts)`
+`(Date.now()/1000 - ts) < 120` — dispositivo online si última lectura hace menos de 2 min.
 
-### fmtTime(ts)
-Convierte key de Firebase a hora: `new Date(parseInt(ts) * 1000)`
-⚠️ **BUG mismo origen**: la key `ts` es uptime en segundos, no epoch. La hora mostrada es incorrecta.
+### `timeSince(ts)` / `fmtTime(ts)`
+Usan timestamp Unix epoch (corregido en firmware). `timeSince` devuelve string legible ("hace 3 min").
 
 ---
 
-## Componentes compartidos
+## Cloud Functions — functions/index.js
 
-| Componente | Props | Usado en |
-|---|---|---|
-| `Card` | `children, style` | Dashboard, Alertas, Historial, Ajustes, Mapa |
-| `SensorRow` | `icon, label, value, unit, color` | Dashboard, Mapa |
-| `LiveDot` | — | Dashboard (header de card sensores), Mapa, Alertas |
+Trigger `onValueCreated` en `/alertas/{alertId}`. Envía email vía nodemailer.
+Credenciales via Firebase Secrets (`defineSecret`), nunca hardcodeadas.
+**Requiere plan Blaze** para llamadas de red salientes.
 
----
-
-## Bugs conocidos
-
-### BUG 1 — Timestamp incorrecto (CRÍTICO)
-**Archivo**: `Codigo/codigo arduino.txt` línea 68 + `utils/helpers.js` líneas 16-21
-
-**Causa**: El ESP32 envía `timestamp = millis()/1000` que es el tiempo en segundos desde que el dispositivo arrancó (uptime), no un Unix timestamp real. Cuando la app hace `Date.now()/1000 - ts`, el resultado es ~1.7 billones (epoch actual) - ~10,000 (uptime) = número enorme. `timeSince` siempre retorna horas incorrectas.
-
-**Fix en Arduino**: cambiar `millis()/1000` por NTP o aceptar que no hay RTC.
-**Fix en App**: si no hay NTP, guardar el timestamp de cuando Firebase recibe el dato (regla en Security Rules o Cloud Function), o mostrar "hace X lecturas" en vez de tiempo relativo.
-
-### BUG 2 — darkMode solo cambia el fondo del root
-**Archivo**: `App.js` línea 49
-
-**Causa**: `bgColor = darkMode ? C.bg : "#F0F4F0"` solo afecta al `View` raíz. Las screens usan `C.card`, `C.bg`, etc. hardcodeados directamente. El toggle en Ajustes se ve pero no cambia los colores internos de ninguna pantalla.
-
-**Fix**: Pasar `darkMode` como prop a todas las screens (o usar Context/Zustand) y reemplazar `C.card` etc. por valores condicionales, o crear un tema dinámico.
-
-### BUG 3 — notifAlertas se resetea al navegar
-**Archivo**: `ScreenAjustes.js` línea 39
-
-**Causa**: `useState(false)` local. Cada vez que el usuario cambia de tab y regresa, el switch vuelve a false aunque lo hubiera activado.
-
-**Fix**: Mover `notifAlertas` a App.js como state global y pasarlo como prop, o usar AsyncStorage para persistirlo.
-
----
-
-## Campos que el Arduino envía pero la app no usa
-
-| Campo | Tipo | Donde llega | Usado en app |
-|---|---|---|---|
-| `nivel` | string | estacion_01 | ❌ La app recalcula con `getInfo(pm25)` |
-| `color` | int (0-4) | estacion_01 | ❌ La app usa C.color de colors.js |
-| `score` | — | solo en getInfo() | ❌ No se renderiza en ninguna pantalla |
-
----
-
-## Dependencias externas clave
-
-```json
-react-native-maps       → ScreenMapa (requiere Google Maps API Key para Android release)
-@expo/vector-icons      → Ionicons + MaterialCommunityIcons (todas las screens)
-firebase                → SDK web modular v9+
-react-native-safe-area-context → App.js (insets para Samsung/notch)
-```
-
----
-
-## Para refactorizar: checklist de conexiones
-
-Antes de tocar cualquier archivo, verificar:
-1. ¿El hook `useStation()` ya está importado o hay que agregarlo?
-2. ¿El campo Firebase que necesitas existe en la estructura de arriba?
-3. ¿`darkMode` llega como prop o hay que pasarlo desde App.js?
-4. ¿Los timestamps que muestras usan `timeSince` o `fmtTime`? Si sí, el BUG 1 aplica.
-5. ¿El estado que guardas necesita sobrevivir al cambio de tab? Si sí, subirlo a App.js.
+Deploy: `firebase deploy --only functions`
+Secrets: `firebase functions:secrets:set SMTP_HOST` (y los 5 restantes)
