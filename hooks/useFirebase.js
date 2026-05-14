@@ -107,6 +107,23 @@ export function useWifiNetworks() {
   return { redes, agregar, eliminar };
 }
 
+// Hook: todos los usuarios (solo admin)
+export function useAllUsers() {
+  const [users,   setUsers]   = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const r = ref(db, "usuarios");
+    const unsub = onValue(r, snap => {
+      setUsers(snap.val() || {});
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsub();
+  }, []);
+
+  return { users, loading };
+}
+
 // Hook: alertas recientes
 export function useAlerts() {
   const [alerts, setAlerts] = useState([]);

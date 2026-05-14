@@ -24,6 +24,7 @@ import ScreenComunidad  from "./screens/ScreenComunidad";
 import ScreenLogin      from "./screens/ScreenLogin";
 import ScreenOnboarding from "./screens/ScreenOnboarding";
 import ScreenSplash     from "./screens/ScreenSplash";
+import ScreenAdmin      from "./screens/ScreenAdmin";
 import { useAuth }      from "./hooks/useAuth";
 import { StationProvider } from "./context/StationContext";
 import { C } from "./constants/colors";
@@ -85,7 +86,8 @@ function AppLayout() {
       case "community": return <ScreenComunidad />;
       case "alerts":    return <ScreenAlertas />;
       case "history":   return <ScreenHistorial />;
-      case "settings":  return <ScreenAjustes />;
+      case "admin":     return <ScreenAdmin onBack={() => handleTabPress("settings")} />;
+      case "settings":  return <ScreenAjustes onGoAdmin={() => handleTabPress("admin")} />;
       default:          return <ScreenDashboard />;
     }
   };

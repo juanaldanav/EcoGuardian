@@ -41,7 +41,7 @@ function Row({ icon, label, sub, right, onPress }) {
 }
 
 // ── Pantalla Ajustes ──────────────────────────────────────────
-export default function ScreenAjustes() {
+export default function ScreenAjustes({ onGoAdmin }) {
   const { user, perfil, isAdmin, login, logout } = useAuth();
 
   // Estaciones vinculadas al usuario
@@ -227,6 +227,10 @@ export default function ScreenAjustes() {
             {isAdmin && (
               <>
                 <View style={ss.div} />
+                <TouchableOpacity onPress={onGoAdmin} style={ss.logoutBtn}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={C.green} />
+                  <Text style={[ss.logoutTxt, { color: C.green }]}>Panel Admin</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={resetearDemo} style={ss.logoutBtn}>
                   <Ionicons name="refresh-outline" size={16} color={C.orange} />
                   <Text style={[ss.logoutTxt, { color: C.orange }]}>Reiniciar demo</Text>
