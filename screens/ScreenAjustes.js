@@ -11,7 +11,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Card from "../components/Card";
-import { ref as dbRef, update, remove } from "firebase/database";
+import { ref as dbRef, update, remove, get } from "firebase/database";
 import { db } from "../constants/firebase";
 import { useStation, useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
@@ -136,15 +136,30 @@ export default function ScreenAjustes({ onGoAdmin }) {
   async function resetearDemo() {
     async function ejecutarReset() {
       try {
-        await Promise.all([
-          remove(dbRef(db, "estaciones/estacion_01")),
-          remove(dbRef(db, "historial/estacion_01")),
-          remove(dbRef(db, "alertas")),
-        ]);
-        await update(dbRef(db, `usuarios/${user.uid}`), {
-          onboardingCompleto: false,
-          estaciones:         null,
+        // Borrar todas las estaciones e historial por ID (respeta las reglas de DB)
+        const estSnap = await get(dbRef(db, "estaciones"));
+        const ids = estSnap.exists() ? Object.keys(estSnap.val()) : [];
+        const ops = [remove(dbRef(db, "alertas"))];
+        ids.forEach(id => {
+          ops.push(remove(dbRef(db, `estaciones/${id}`)));
+          ops.push(remove(dbRef(db, `historial/${id}`)));
         });
+        await Promise.all(ops);
+
+        // Desasignar dispositivos de todos los usuarios excepto admin
+        const usersSnap = await get(dbRef(db, "usuarios"));
+        if (usersSnap.exists()) {
+          const updates = {};
+          Object.entries(usersSnap.val()).forEach(([uid, u]) => {
+            if (u.rol !== "admin") {
+              updates[`usuarios/${uid}/onboardingCompleto`] = false;
+              updates[`usuarios/${uid}/estaciones`] = null;
+            }
+          });
+          if (Object.keys(updates).length > 0) {
+            await update(dbRef(db, "/"), updates);
+          }
+        }
       } catch (e) {
         if (Platform.OS === "web") {
           window.alert(`No se pudo reiniciar: ${e.message}`);
@@ -155,7 +170,7 @@ export default function ScreenAjustes({ onGoAdmin }) {
     }
 
     if (Platform.OS === "web") {
-      if (window.confirm("¿Reiniciar demo? Se borrarán mediciones, historial y alertas, y se desvinculará el dispositivo.")) {
+      if (window.confirm("¿Reiniciar demo? Se borrarán TODAS las estaciones, historial y alertas. Los usuarios quedarán como exploradores. La cuenta admin no se toca.")) {
         await ejecutarReset();
       }
       return;
@@ -163,7 +178,7 @@ export default function ScreenAjustes({ onGoAdmin }) {
 
     Alert.alert(
       "Reiniciar demo",
-      "Se borrarán las mediciones, historial y alertas actuales, y se desvinculará el dispositivo de tu cuenta. ¿Continuar?",
+      "Se borrarán TODAS las estaciones, historial y alertas. Los usuarios quedarán como exploradores. La cuenta admin no se toca. ¿Continuar?",
       [
         { text: "Cancelar" },
         { text: "Reiniciar", style: "destructive", onPress: ejecutarReset },

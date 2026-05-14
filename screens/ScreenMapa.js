@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platf
 import MapView, { Marker, Circle } from "react-native-maps";
 import LiveDot   from "../components/LiveDot";
 import { useStations } from "../hooks/useFirebase";
+import { useStationContext } from "../context/StationContext";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -33,20 +34,15 @@ const MAP_STYLE = [
 
 export default function ScreenMapa() {
   const { stations } = useStations();
-  const mapRef       = useRef(null);
-  const [selected, setSelected] = useState(null);
+  const { selectedId, setSelectedId, stationLabel } = useStationContext();
+  const mapRef = useRef(null);
 
   const lista = Object.entries(stations);
 
-  // Selecciona la primera estación por defecto cuando cargan los datos
-  useEffect(() => {
-    if (lista.length > 0 && !selected) {
-      setSelected(lista[0][0]);
-    }
-  }, [lista.length]);
-
-  const data = selected ? stations[selected] : lista[0]?.[1] ?? null;
-  const info = getInfo(data?.pm25 || 0);
+  // Fallback: si el contexto no tiene selección (explorador), usar la primera estación
+  const activeId = selectedId || lista[0]?.[0] || null;
+  const data     = activeId ? stations[activeId] : null;
+  const info     = getInfo(data?.pm25 || 0);
 
   return (
     <ScrollView style={{ flex:1 }} showsVerticalScrollIndicator={false}>
@@ -85,11 +81,11 @@ export default function ScreenMapa() {
                   title={st?.nombre || id}
                   description={`PM2.5: ${(st?.pm25||0).toFixed(1)} µg/m³ — ${stInfo.label}`}
                   tracksViewChanges={false}
-                  onPress={() => setSelected(id)}
+                  onPress={() => setSelectedId(id)}
                 >
                   <View style={[ss.markerWrap, { shadowColor:stInfo.color }]}>
                     <View style={[ss.markerInner,
-                      { backgroundColor: selected === id ? stInfo.color : stInfo.color + "CC" }]}>
+                      { backgroundColor: activeId === id ? stInfo.color : stInfo.color + "CC" }]}>
                       <MaterialCommunityIcons name="air-filter" size={16} color="#fff" />
                     </View>
                     <View style={[ss.markerTail, { borderTopColor:stInfo.color }]} />
@@ -120,7 +116,7 @@ export default function ScreenMapa() {
         <View style={ss.bottomSheet}>
           <View style={ss.sheetTop}>
             <View style={{ flex:1 }}>
-              <Text style={ss.stationName}>{data?.nombre || selected || "Estación"}</Text>
+              <Text style={ss.stationName}>{data?.nombre || stationLabel(activeId) || "Estación"}</Text>
               {data?.lat && data?.lng && data.lat !== 0 && (
                 <Text style={ss.stationCoords}>
                   {data.lat.toFixed(5)} °N · {data.lng.toFixed(5)} °O
@@ -174,8 +170,8 @@ export default function ScreenMapa() {
             return (
               <TouchableOpacity
                 key={id}
-                style={[ss.stationItem, selected === id && ss.stationItemActive]}
-                onPress={() => setSelected(id)}
+                style={[ss.stationItem, activeId === id && ss.stationItemActive]}
+                onPress={() => setSelectedId(id)}
                 activeOpacity={0.75}
               >
                 <View style={[ss.stationDot, { backgroundColor: stInfo.color }]} />
