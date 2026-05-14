@@ -25,6 +25,7 @@ import ScreenLogin      from "./screens/ScreenLogin";
 import ScreenOnboarding from "./screens/ScreenOnboarding";
 import ScreenSplash     from "./screens/ScreenSplash";
 import { useAuth }      from "./hooks/useAuth";
+import { StationProvider } from "./context/StationContext";
 import { C } from "./constants/colors";
 import { F } from "./constants/fonts";
 
@@ -90,6 +91,7 @@ function AppLayout() {
   };
 
   return (
+    <StationProvider>
     <View style={[ss.root, { backgroundColor: C.bg }]}>
       <View style={{ height: insets.top, backgroundColor: C.bg }} />
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} translucent={false} />
@@ -125,6 +127,7 @@ function AppLayout() {
         })}
       </View>
     </View>
+    </StationProvider>
   );
 }
 

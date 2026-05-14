@@ -7,15 +7,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Card from "../components/Card";
 import { useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
+import { useStationContext } from "../context/StationContext";
 import { getInfo, fmtTime } from "../utils/helpers";
 import { C } from "../constants/colors";
 
 const FILAS_INICIALES = 5;
 
 export default function ScreenHistorial() {
-  const { perfil }        = useAuth();
-  const estacionIds       = Object.keys(perfil?.estaciones || {});
-  const stationId         = estacionIds[0] || null;
+  const { selectedId }    = useStationContext();
+  const stationId         = selectedId;
   const { hist, loading } = useHistory(stationId);
   const [barSel, setBarSel]       = useState(null);
   const [mostrarTodo, setMostrar] = useState(false);

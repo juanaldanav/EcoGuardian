@@ -12,6 +12,7 @@ import SensorRow from "../components/SensorRow";
 import LiveDot   from "../components/LiveDot";
 import { useStation, useHistory } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
+import { useStationContext } from "../context/StationContext";
 import { getInfo, timeSince, isDeviceOnline, METRICAS, getCO2Info, getTVOCInfo } from "../utils/helpers";
 import { C } from "../constants/colors";
 
@@ -216,13 +217,13 @@ function ResumenModal({ visible, onClose, data, hist }) {
 
 // ── Pantalla principal ────────────────────────────────────────
 export default function ScreenDashboard() {
-  const { perfil }        = useAuth();
-  const estacionIds       = Object.keys(perfil?.estaciones || {});
-  const stationId         = estacionIds[0] || null;
+  const { selectedId, setSelectedId, listaIds, stations } = useStationContext();
+  const stationId         = selectedId;
   const { data, loading } = useStation(stationId);
   const { hist }          = useHistory(stationId);
   const [modalVisible,   setModalVisible]   = useState(false);
-  const [metricaModal,   setMetricaModal]   = useState(null); // key de METRICAS
+  const [metricaModal,   setMetricaModal]   = useState(null);
+  const [dropdownOpen,   setDropdownOpen]   = useState(false);
 
   const online   = isDeviceOnline(data);
   const lastSync = timeSince(data?.timestamp);
@@ -277,11 +278,22 @@ export default function ScreenDashboard() {
         <View style={ss.heroDeco1} />
         <View style={ss.heroDeco2} />
 
+        {/* Selector de estación — visible cuando hay más de una */}
+        {listaIds.length > 1 && (
+          <TouchableOpacity style={ss.selectorBtn} onPress={() => setDropdownOpen(true)} activeOpacity={0.8}>
+            <Ionicons name="layers-outline" size={13} color="rgba(255,255,255,0.8)" />
+            <Text style={ss.selectorTxt} numberOfLines={1}>
+              {stations[stationId]?.nombre || stationId}
+            </Text>
+            <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+        )}
+
         {/* Live row */}
         <View style={ss.liveRow}>
           <Animated.View style={[ss.liveDot, { transform:[{ scale:pulseAnim }], opacity: online ? 1 : 0.4 }]} />
           <Text style={ss.liveTxt}>
-            {online ? `EN VIVO · ${data?.nombre || "ESTACIÓN 1"}` : "SIN CONEXIÓN"}
+            {online ? `EN VIVO · ${data?.nombre || stationId}` : "SIN CONEXIÓN"}
           </Text>
         </View>
 
@@ -435,6 +447,41 @@ export default function ScreenDashboard() {
           onClose={() => setMetricaModal(null)}
         />
       )}
+
+      {/* ── DROPDOWN SELECTOR ─────────────────────── */}
+      <Modal visible={dropdownOpen} transparent animationType="fade" onRequestClose={() => setDropdownOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setDropdownOpen(false)}>
+          <View style={ss.dropOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={ss.dropBox}>
+                <Text style={ss.dropTitle}>Seleccionar estación</Text>
+                {listaIds.map(id => (
+                  <TouchableOpacity
+                    key={id}
+                    style={[ss.dropItem, id === stationId && ss.dropItemActive]}
+                    onPress={() => { setSelectedId(id); setDropdownOpen(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={id === stationId ? "radio-button-on" : "radio-button-off"}
+                      size={16}
+                      color={id === stationId ? C.green : C.text3}
+                      style={{ marginRight: 10 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[ss.dropItemName, id === stationId && { color: C.green }]}>
+                        {stations[id]?.nombre || id}
+                      </Text>
+                      <Text style={ss.dropItemId}>{id}</Text>
+                    </View>
+                    {id === stationId && <Ionicons name="checkmark" size={16} color={C.green} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </ScrollView>
   );
 }
@@ -585,4 +632,27 @@ const ss = StyleSheet.create({
   promedioUnit:      { fontFamily:"JetBrainsMono_400Regular", fontSize:9, color:C.text3 },
   promedioLabel:     { fontFamily:"Outfit_400Regular", fontSize:9, color:C.text2 },
   modalCloseBtn:     { paddingVertical:12, borderRadius:12, alignItems:"center", marginTop:4 },
+
+  // Selector de estación
+  selectorBtn:       { flexDirection:"row", alignItems:"center", gap:5, alignSelf:"center",
+                       backgroundColor:"rgba(255,255,255,0.12)", borderRadius:20,
+                       paddingHorizontal:12, paddingVertical:5, marginBottom:10 },
+  selectorTxt:       { fontFamily:"Outfit_600SemiBold", fontSize:11,
+                       color:"rgba(255,255,255,0.9)", maxWidth:180 },
+
+  // Dropdown modal
+  dropOverlay:       { flex:1, backgroundColor:"rgba(0,0,0,0.45)",
+                       justifyContent:"center", paddingHorizontal:24 },
+  dropBox:           { backgroundColor:C.card, borderRadius:20, overflow:"hidden",
+                       borderWidth:1, borderColor:C.border },
+  dropTitle:         { fontFamily:"Outfit_600SemiBold", fontSize:13, color:C.text2,
+                       letterSpacing:0.5, paddingHorizontal:18, paddingVertical:14,
+                       borderBottomWidth:1, borderBottomColor:C.border },
+  dropItem:          { flexDirection:"row", alignItems:"center",
+                       paddingHorizontal:18, paddingVertical:14,
+                       borderBottomWidth:1, borderBottomColor:C.border },
+  dropItemActive:    { backgroundColor:C.green + "10" },
+  dropItemName:      { fontFamily:"Outfit_600SemiBold", fontSize:14, color:C.text },
+  dropItemId:        { fontFamily:"JetBrainsMono_400Regular", fontSize:10,
+                       color:C.text3, marginTop:2 },
 });

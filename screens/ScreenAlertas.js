@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import LiveDot from "../components/LiveDot";
 import { useStation, useAlerts } from "../hooks/useFirebase";
 import { useAuth } from "../hooks/useAuth";
+import { useStationContext } from "../context/StationContext";
 import { getInfo, timeSince } from "../utils/helpers";
 import { C } from "../constants/colors";
 
@@ -22,9 +23,9 @@ const OMS_BAR_COLORS = [C.green, C.yellow, C.orange, C.red, C.purple];
 const OMS_MARKS = ["0", "12", "35", "55", "150", "500"];
 
 export default function ScreenAlertas() {
-  const { perfil }  = useAuth();
-  const stationId   = Object.keys(perfil?.estaciones || {})[0] || null;
-  const { data }    = useStation(stationId);
+  const { selectedId } = useStationContext();
+  const stationId      = selectedId;
+  const { data }       = useStation(stationId);
   const alerts      = useAlerts();
   const info      = getInfo(data?.pm25 || 0);
   const alarmaActiva = data?.alarma && data?.pm25 > 35;
