@@ -225,7 +225,9 @@ void setup() {
   mac.replace(":", "");
   mac.toLowerCase();
   stationId     = "estacion_" + mac.substring(6);   // "estacion_ddeeff"
-  stationNombre = "EcoG " + mac.substring(6).toUpperCase();  // "EcoG DDEEFF"
+  String macSuffix = mac.substring(6);
+  macSuffix.toUpperCase();
+  stationNombre = "EcoG " + macSuffix;               // "EcoG DDEEFF"
 
   Serial.println("\n+==============================+");
   Serial.println("|   EcoGuardian  v5.2          |");
